@@ -221,6 +221,8 @@ def test_nested_capturers_restore_correctly():
         with OutputCapturer() as inner:
             print("nested")
 
+    assert "nested" in outer.get_output()
+    assert "nested" in inner.get_output()
     assert sys.stdout is original_stdout
     assert sys.stderr is original_stderr
     assert logging.root.handlers == original_handlers
@@ -247,9 +249,13 @@ def test_nested_capturer_exception_restores_all():
 
     with pytest.raises(ValueError):
         with OutputCapturer() as outer:
+            print("Hello Outer!")
             with OutputCapturer() as inner:
+                print("Hello Inner!")
                 raise ValueError("inner error")
 
+    assert "Hello Outer!" in outer.get_output()
+    assert "Hello Inner!" in inner.get_output()
     assert sys.stdout is original_stdout
 
 
