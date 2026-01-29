@@ -98,5 +98,5 @@ class SingleThreadEnforcerMixin:
 
     def __init__(self, *args, **kwargs):
         """Initialize and register the current thread as the owner."""
-        super().__init__(*args, **kwargs)
         _restrict_to_single_thread()
+        super().__init__(*args, **kwargs)
