@@ -187,3 +187,82 @@ def test_repr_shows_captured_chars():
         print(text_to_print)
 
     assert "OutputCapturer" in repr(capturer)
+
+
+# ============================================================================
+# Nested context tests
+# ============================================================================
+
+def test_nested_capturers_both_capture_output():
+    """Verify that when capturers are nested, both see the appropriate output."""
+    with OutputCapturer() as outer:
+        print("outer only")
+        with OutputCapturer() as inner:
+            print("both see this")
+        print("outer only again")
+
+    outer_output = outer.get_output()
+    inner_output = inner.get_output()
+
+    assert "outer only" in outer_output
+    assert "both see this" in outer_output
+    assert "outer only again" in outer_output
+    assert "both see this" in inner_output
+    assert "outer only" not in inner_output
+
+
+def test_nested_capturers_restore_correctly():
+    """Verify streams are properly restored after nested contexts."""
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    original_handlers = logging.root.handlers[:]
+
+    with OutputCapturer() as outer:
+        with OutputCapturer() as inner:
+            print("nested")
+
+    assert sys.stdout is original_stdout
+    assert sys.stderr is original_stderr
+    assert logging.root.handlers == original_handlers
+
+
+def test_capturer_created_before_entering_another():
+    """Verify capturers work correctly when created before entering contexts."""
+    outer = OutputCapturer()
+    inner = OutputCapturer()
+
+    with outer:
+        print("outer sees this")
+        with inner:
+            print("both should see this")
+
+    assert "outer sees this" in outer.get_output()
+    assert "both should see this" in outer.get_output()
+    assert "both should see this" in inner.get_output()
+
+
+def test_nested_capturer_exception_restores_all():
+    """Verify exception in inner context properly restores outer's state."""
+    original_stdout = sys.stdout
+
+    with pytest.raises(ValueError):
+        with OutputCapturer() as outer:
+            with OutputCapturer() as inner:
+                raise ValueError("inner error")
+
+    assert sys.stdout is original_stdout
+
+
+def test_nested_logging_both_capture():
+    """Verify logging works correctly with nested capturers."""
+    logging.getLogger().setLevel(logging.INFO)
+
+    with OutputCapturer() as outer:
+        logging.info("outer log")
+        with OutputCapturer() as inner:
+            logging.info("inner log")
+
+    assert "outer log" in outer.get_output()
+    assert "inner log" in outer.get_output()
+    assert "inner log" in inner.get_output()
+    assert "outer log" not in inner.get_output()
