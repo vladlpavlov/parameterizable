@@ -43,6 +43,14 @@ def _run(command: list[str], timeout: int = 300) -> None:
     importlib.invalidate_caches()
 
 
+def _is_module_available(module_name: str) -> bool:
+    try:
+        importlib.import_module(module_name)
+        return True
+    except ModuleNotFoundError:
+        return False
+
+
 def _validate_package_args(
         package_name: str,
         import_name: str | None = None,
@@ -69,6 +77,33 @@ def _validate_package_args(
         raise ValueError("import_name must be a non-empty string")
 
 
+def _ensure_pip_available() -> None:
+    """Ensure pip is available, bootstrapping via uv or ensurepip as needed."""
+    if _is_module_available("pip"):
+        return
+
+    if _is_module_available("uv"):
+        install_package("pip", use_uv=True)
+        return
+
+    try:
+        _run([sys.executable, "-m", "ensurepip", "--upgrade"])
+        importlib.import_module("pip")
+    except (RuntimeError, ModuleNotFoundError) as e:
+        raise RuntimeError(
+            "pip is not available, and ensurepip failed to bootstrap pip."
+        ) from e
+
+
+def _ensure_uv_available() -> None:
+    """Ensure uv is available, bootstrapping via pip as needed."""
+    if _is_module_available("uv"):
+        return
+
+    _ensure_pip_available()
+    install_package("uv", use_uv=False)
+
+
 @cache
 def _install_uv_and_pip() -> None:
     """Ensure both package managers are available for installation.
@@ -80,34 +115,8 @@ def _install_uv_and_pip() -> None:
         Called automatically by install_package for any package except pip
         or uv themselves.
     """
-    uv_available = True
-    pip_available = True
-
-    try:
-        importlib.import_module("uv")
-    except ModuleNotFoundError:
-        uv_available = False
-
-    try:
-        importlib.import_module("pip")
-    except ModuleNotFoundError:
-        pip_available = False
-
-    if not uv_available and not pip_available:
-        try:
-            _run([sys.executable, "-m", "ensurepip", "--upgrade"])
-            importlib.import_module("pip")
-            pip_available = True
-        except (RuntimeError, ModuleNotFoundError) as e:
-            raise RuntimeError(
-                "Neither pip nor uv is available, and ensurepip failed to "
-                "bootstrap pip.") from e
-
-    if not uv_available:
-        install_package("uv", use_uv=False)
-
-    if not pip_available:
-        install_package("pip", use_uv=True)
+    _ensure_pip_available()
+    _ensure_uv_available()
 
 
 def install_package(package_name: str,
@@ -151,11 +160,15 @@ def install_package(package_name: str,
         version=version,
     )
 
-    if package_name == "pip" and not use_uv:
-        raise ValueError("pip must be installed using uv (use_uv=True)")
-    elif package_name == "uv" and use_uv:
-        raise ValueError("uv must be installed using pip (use_uv=False)")
-    elif package_name not in ("pip", "uv"):
+    if package_name == "pip":
+        if not use_uv:
+            raise ValueError("pip must be installed using uv (use_uv=True)")
+        _ensure_uv_available()
+    elif package_name == "uv":
+        if use_uv:
+            raise ValueError("uv must be installed using pip (use_uv=False)")
+        _ensure_pip_available()
+    else:
         _install_uv_and_pip()
 
     if use_uv:
