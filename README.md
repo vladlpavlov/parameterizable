@@ -435,10 +435,10 @@ total size freed.
 <!-- MIXINFORGE_STATS_START -->
 | Metric | Main code | Unit Tests | Total |
 |--------|-----------|------------|-------|
-| Lines Of Code (LOC) | 4355 | 11330 | 15685 |
-| Source Lines Of Code (SLOC) | 1928 | 6525 | 8453 |
-| Classes | 20 | 200 | 220 |
-| Functions / Methods | 148 | 953 | 1101 |
+| Lines Of Code (LOC) | 4419 | 11357 | 15776 |
+| Source Lines Of Code (SLOC) | 1960 | 6547 | 8507 |
+| Classes | 20 | 203 | 223 |
+| Functions / Methods | 150 | 959 | 1109 |
 | Files | 25 | 82 | 107 |
 <!-- MIXINFORGE_STATS_END -->
 
