@@ -75,22 +75,19 @@ def test_hash_fails_during_initialization():
         PrematureHasher()
 
 def test_initialization_guard_compliance():
-    """Verify that failing to set _init_finished=False triggers GuardedInitMeta error."""
-    # This tests the interaction with GuardedInitMeta via the mixin
-    
-    # If we DON'T call super().__init__(), _init_finished might not be set to False
-    # (assuming it's not set by allocator).
-    # GuardedInitMeta requires _init_finished to be False at the end of __init__
-    
+    """Verify that setting _init_finished=True prematurely triggers GuardedInitMeta error."""
+    # GuardedInitMeta auto-injects _init_finished=False before __init__ runs,
+    # but if __init__ sets it to True prematurely, an error is raised.
+
     class BadInit(ImmutableParameterizableMixin):
         def __init__(self):
-            # Deliberately skip super().__init__() which sets _init_finished = False
-            pass
-            
+            super().__init__()
+            self._init_finished = True  # Prematurely set to True
+
         def get_params(self):
             return {}
 
-    with pytest.raises(RuntimeError, match="must set attribute _init_finished to False"):
+    with pytest.raises(RuntimeError, match="must not set _init_finished to True"):
         BadInit()
 
 def test_param_retrieval():

@@ -107,6 +107,59 @@ def _invoke_post_setstate_hook(instance: Any) -> None:
             _re_raise_with_context("__post_setstate__", e)
 
 
+def _has_slots_without_dict(cls: type) -> bool:
+    """Check if a class uses __slots__ without __dict__.
+
+    Args:
+        cls: The class to check.
+
+    Returns:
+        True if the class has __slots__ but no __dict__ slot.
+    """
+    for klass in cls.__mro__:
+        if klass is object:
+            continue
+        slots = getattr(klass, '__slots__', None)
+        if slots is not None:
+            if '__dict__' in slots:
+                return False
+            if isinstance(slots, str):
+                slots = (slots,)
+            if slots:
+                return True
+    return False
+
+
+def _validate_init_finished_slot(cls: type, name: str) -> None:
+    """Validate that _init_finished is declared in __slots__ if needed.
+
+    Args:
+        cls: The class to validate.
+        name: Class name for error reporting.
+
+    Raises:
+        TypeError: If class uses __slots__ without __dict__ and doesn't
+            declare _init_finished.
+    """
+    if not _has_slots_without_dict(cls):
+        return
+
+    for klass in cls.__mro__:
+        if klass is object:
+            continue
+        slots = getattr(klass, '__slots__', None)
+        if slots is not None:
+            if isinstance(slots, str):
+                slots = (slots,)
+            if '_init_finished' in slots:
+                return
+
+    raise TypeError(
+        f"Class {name} uses __slots__ without __dict__, but does not declare "
+        "'_init_finished' in __slots__. Add '_init_finished' to __slots__."
+    )
+
+
 class GuardedInitMeta(ABCMeta):
     """Metaclass for strict initialization control and lifecycle hooks.
 
@@ -114,16 +167,23 @@ class GuardedInitMeta(ABCMeta):
     and only becomes True after all initialization code completes. This ensures
     that properties and methods can reliably check initialization state.
 
-    The metaclass automatically wraps __setstate__ to maintain the same
-    contract during unpickling, and invokes __post_init__ and __post_setstate__
-    hooks when defined.
+    The metaclass automatically:
+    - Injects _init_finished = False before __init__ runs
+    - Sets _init_finished = True after __init__ completes
+    - Wraps __setstate__ to maintain the same contract during unpickling
+    - Invokes __post_init__ and __post_setstate__ hooks when defined
 
     Contract:
-        - __init__ must set self._init_finished = False immediately.
-        - The metaclass sets self._init_finished = True after __init__ returns
+        - The metaclass sets _init_finished = False before __init__ runs.
+        - The metaclass sets _init_finished = True after __init__ returns
           (but before __post_init__, if defined).
+        - Subclasses must NOT set _init_finished = True in __init__.
         - __setstate__ is wrapped to ensure _init_finished becomes True after
           full state restoration (but before __post_setstate__, if defined).
+
+    Note:
+        If a class uses __slots__ without __dict__, it must include
+        '_init_finished' in its __slots__ declaration.
     """
 
     def __init__(cls, name, bases, dct):
@@ -138,10 +198,12 @@ class GuardedInitMeta(ABCMeta):
             dct: Class dictionary.
 
         Raises:
-            TypeError: If class is a dataclass or has multiple GuardedInitMeta bases.
+            TypeError: If class is a dataclass, has multiple GuardedInitMeta bases,
+                or uses __slots__ without declaring _init_finished.
         """
         super().__init__(name, bases, dct)
         _raise_if_dataclass(cls)
+        _validate_init_finished_slot(cls, name)
 
         n_guarded_bases = sum(1 for base in bases if isinstance(base, GuardedInitMeta))
         if n_guarded_bases > 1:
@@ -187,8 +249,8 @@ class GuardedInitMeta(ABCMeta):
     def __call__(cls: Type[T], *args: Any, **kwargs: Any) -> T:
         """Create instance, enforce initialization contract, and invoke hook.
 
-        Ensures _init_finished is False during __init__, sets it to True afterward,
-        and invokes __post_init__ if defined.
+        Auto-injects _init_finished = False before __init__, sets it to True
+        afterward, and invokes __post_init__ if defined.
 
         Args:
             *args: Positional arguments for __init__.
@@ -198,18 +260,25 @@ class GuardedInitMeta(ABCMeta):
             The initialized instance.
 
         Raises:
-            RuntimeError: If _init_finished is not False after __init__.
+            RuntimeError: If _init_finished is set to True during __init__.
             TypeError: If __post_init__ is not callable.
         """
         _raise_if_dataclass(cls)
 
-        instance = super().__call__(*args, **kwargs)
+        instance = cls.__new__(cls, *args, **kwargs)
         if not isinstance(instance, cls):
             return instance
 
-        if not hasattr(instance, '_init_finished') or instance._init_finished:
-            raise RuntimeError(f"Class {cls.__name__} must set attribute "
-                               "_init_finished to False in __init__")
+        # Auto-inject _init_finished = False before __init__
+        instance._init_finished = False
+
+        instance.__init__(*args, **kwargs)
+
+        # Validate that __init__ didn't prematurely set _init_finished = True
+        if instance._init_finished:
+            raise RuntimeError(
+                f"{cls.__name__}.__init__ must not set _init_finished to True"
+            )
 
         instance._init_finished = True
 

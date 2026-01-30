@@ -35,13 +35,8 @@ class ImmutableMixin(metaclass=GuardedInitMeta):
     """
 
     def __init__(self, *args, **kwargs):
-        """Initialize the mixin with an initialization guard.
-
-        Sets up the _init_finished flag to prevent premature access to the
-        identity key during object construction. The GuardedInitMeta
-        metaclass sets this flag to True after initialization completes.
+        """Initialize the mixin.
         """
-        self._init_finished = False
         super().__init__(*args, **kwargs)
 
     def get_identity_key(self) -> Any:

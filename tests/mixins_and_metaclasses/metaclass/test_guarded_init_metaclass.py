@@ -7,7 +7,6 @@ from mixinforge import GuardedInitMeta
 
 class PickleClass(metaclass=GuardedInitMeta):
     def __init__(self, value):
-        self._init_finished = False
         self.value = value
 
     def __getstate__(self):
@@ -18,11 +17,10 @@ class PickleClass(metaclass=GuardedInitMeta):
 
 class BadPickleClass(metaclass=GuardedInitMeta):
     def __init__(self):
-        self._init_finished = False
+        pass
 
 class PostSetStateClass(metaclass=GuardedInitMeta):
     def __init__(self):
-        self._init_finished = False
         self.restored = False
 
     def __getstate__(self):
@@ -35,7 +33,7 @@ class PostSetStateClass(metaclass=GuardedInitMeta):
 
 class ErrorPostSetStateClass(metaclass=GuardedInitMeta):
     def __init__(self):
-        self._init_finished = False
+        pass
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -49,7 +47,7 @@ class ErrorPostSetStateClass(metaclass=GuardedInitMeta):
 
 class ParentWithSetState(metaclass=GuardedInitMeta):
     def __init__(self):
-        self._init_finished = False
+        pass
     def __getstate__(self):
         d = self.__dict__.copy()
         d.pop('_init_finished', None)
@@ -63,7 +61,6 @@ class ChildInheritsSetState(ParentWithSetState):
 
 class ClassDictOnly(metaclass=GuardedInitMeta):
     def __init__(self, value):
-        self._init_finished = False
         self.value = value
     def __getstate__(self):
         d = self.__dict__.copy()
@@ -73,7 +70,6 @@ class ClassDictOnly(metaclass=GuardedInitMeta):
 class ClassSlotsOnly(metaclass=GuardedInitMeta):
     __slots__ = ('value', '_init_finished')
     def __init__(self, value):
-        self._init_finished = False
         self.value = value
     def __getstate__(self):
         return (None, {'value': self.value})
@@ -81,7 +77,6 @@ class ClassSlotsOnly(metaclass=GuardedInitMeta):
 class ClassDictAndSlots(metaclass=GuardedInitMeta):
     __slots__ = ('s_val', '_init_finished', '__dict__')
     def __init__(self, d_val, s_val):
-        self._init_finished = False
         self.d_val = d_val
         self.s_val = s_val
     def __getstate__(self):
@@ -93,17 +88,17 @@ class FactoryClass(metaclass=GuardedInitMeta):
     def __new__(cls):
         return {"not": "instance"}
     def __init__(self):
-        self._init_finished = False
+        pass
 
 class BadPostInitClass(metaclass=GuardedInitMeta):
     __post_init__ = 123
     def __init__(self):
-        self._init_finished = False
+        pass
 
 class BadPostSetStateClass(metaclass=GuardedInitMeta):
     __post_setstate__ = "foo"
     def __init__(self):
-        self._init_finished = False
+        pass
     def __getstate__(self):
         d = self.__dict__.copy()
         d.pop('_init_finished', None)
@@ -112,7 +107,7 @@ class BadPostSetStateClass(metaclass=GuardedInitMeta):
 class SlotsMismatchClass(metaclass=GuardedInitMeta):
     __slots__ = ('x', '_init_finished')
     def __init__(self):
-        self._init_finished = False
+        pass
     def __getstate__(self):
         # Return a dict to trigger the mismatch error during setstate
         return {'x': 1}
@@ -129,7 +124,6 @@ class PlainBaseWithSetState:
 
 class GuardedChildInheritingPlain(PlainBaseWithSetState, metaclass=GuardedInitMeta):
     def __init__(self):
-        self._init_finished = False
         super().__init__()
 
     def __getstate__(self):
@@ -140,33 +134,31 @@ class GuardedChildInheritingPlain(PlainBaseWithSetState, metaclass=GuardedInitMe
 # --- Tests ---
 
 def test_basic_initialization():
-    """Test that initialization works correctly when contract is followed."""
+    """Test that initialization works correctly with auto-injected _init_finished."""
     class GoodClass(metaclass=GuardedInitMeta):
         def __init__(self):
-            self._init_finished = False
             self.value = 10
 
     obj = GoodClass()
     assert obj._init_finished is True
     assert obj.value == 10
 
-def test_missing_init_flag():
-    """Test that RuntimeError is raised if _init_finished is not set to False in __init__."""
+def test_premature_init_finished_true():
+    """Test that RuntimeError is raised if _init_finished is set to True in __init__."""
     class BadClass(metaclass=GuardedInitMeta):
         def __init__(self):
             self.value = 10
-            # Missing self._init_finished = False
+            self._init_finished = True  # Prematurely set to True
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="must not set _init_finished to True"):
         BadClass()
 
 def test_post_init_hook():
     """Test that __post_init__ is called."""
     class PostInitClass(metaclass=GuardedInitMeta):
         def __init__(self):
-            self._init_finished = False
             self.initialized_count = 0
-            
+
         def __post_init__(self):
             self.initialized_count += 1
 
@@ -178,8 +170,8 @@ def test_post_init_error():
     """Test that errors in __post_init__ are re-raised with context."""
     class ErrorPostInitClass(metaclass=GuardedInitMeta):
         def __init__(self):
-            self._init_finished = False
-            
+            pass
+
         def __post_init__(self):
             raise ValueError("Something went wrong")
 
@@ -301,11 +293,11 @@ def test_multiple_guarded_bases_rejected():
     """Test that multiple GuardedInitMeta bases are rejected."""
     class FirstGuarded(metaclass=GuardedInitMeta):
         def __init__(self):
-            self._init_finished = False
+            pass
 
     class SecondGuarded(metaclass=GuardedInitMeta):
         def __init__(self):
-            self._init_finished = False
+            pass
 
     with pytest.raises(TypeError):
         class MultipleGuardedBases(FirstGuarded, SecondGuarded):
@@ -343,3 +335,35 @@ def test_inherited_unwrapped_setstate_is_wrapped():
     assert loaded._init_finished is True
     # Verify wrapper presence
     assert getattr(GuardedChildInheritingPlain.__setstate__, "__guarded_init_meta_wrapped__", False)
+
+
+def test_slots_without_init_finished_rejected():
+    """Test that classes with __slots__ but no _init_finished are rejected."""
+    with pytest.raises(TypeError, match="_init_finished"):
+        class BadSlotsClass(metaclass=GuardedInitMeta):
+            __slots__ = ('value',)  # Missing _init_finished
+            def __init__(self, value):
+                self.value = value
+
+
+def test_slots_with_dict_slot_allowed():
+    """Test that classes with __slots__ including __dict__ don't need _init_finished in slots."""
+    class SlotsWithDictClass(metaclass=GuardedInitMeta):
+        __slots__ = ('value', '__dict__')
+        def __init__(self, value):
+            self.value = value
+
+    obj = SlotsWithDictClass(42)
+    assert obj._init_finished is True
+    assert obj.value == 42
+
+
+def test_init_finished_accessible_during_init():
+    """Test that _init_finished is False and accessible during __init__."""
+    class CheckDuringInit(metaclass=GuardedInitMeta):
+        def __init__(self):
+            self.init_finished_during_init = self._init_finished
+
+    obj = CheckDuringInit()
+    assert obj.init_finished_during_init is False
+    assert obj._init_finished is True
