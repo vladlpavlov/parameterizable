@@ -5,7 +5,11 @@ protection mechanisms for dynamic package management.
 """
 
 import importlib
+import os
+import subprocess
 import sys
+import textwrap
+from pathlib import Path
 import pytest
 
 from mixinforge import (
@@ -13,6 +17,48 @@ from mixinforge import (
     uninstall_package,
 )
 from mixinforge.utility_functions.package_manager import _validate_package_args
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = PROJECT_ROOT / "src"
+
+
+def _venv_python(venv_dir: Path) -> Path:
+    if os.name == "nt":
+        return venv_dir / "Scripts" / "python.exe"
+    return venv_dir / "bin" / "python"
+
+
+def _create_venv_without_pip(tmp_path: Path) -> Path:
+    venv_dir = tmp_path / "venv"
+    subprocess.run(
+        [sys.executable, "-m", "venv", "--without-pip", str(venv_dir)],
+        check=True,
+    )
+    return venv_dir
+
+
+def _run_in_venv(venv_dir: Path, script: str) -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(SRC_ROOT) + (
+        os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
+    )
+    env["PIP_NO_INDEX"] = "1"
+    env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
+    env["PIP_CONFIG_FILE"] = os.devnull
+    env["PIP_FIND_LINKS"] = ""
+
+    result = subprocess.run(
+        [str(_venv_python(venv_dir)), "-c", script],
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    assert result.returncode == 0, (
+        "Subprocess failed.\n"
+        f"stdout:\n{result.stdout}\n"
+        f"stderr:\n{result.stderr}"
+    )
 
 
 # Validation Tests
@@ -271,6 +317,60 @@ def test_idempotent_install(use_uv):
             uninstall_package(package, use_uv=use_uv, verify_uninstall=False)
         except Exception:
             pass
+
+
+def test_install_uv_bootstraps_pip_when_missing(tmp_path):
+    """Installing uv bootstraps pip via ensurepip in a pip-less venv."""
+    venv_dir = _create_venv_without_pip(tmp_path)
+    script = textwrap.dedent(
+        """
+        import importlib
+        from mixinforge import install_package
+
+        for name in ("pip", "uv"):
+            try:
+                importlib.import_module(name)
+                raise SystemExit(f"{name} unexpectedly available")
+            except ModuleNotFoundError:
+                pass
+
+        try:
+            install_package("uv", use_uv=False, verify_import=False)
+        except RuntimeError:
+            pass
+
+        importlib.invalidate_caches()
+        importlib.import_module("pip")
+        """
+    )
+    _run_in_venv(venv_dir, script)
+
+
+def test_install_pip_bootstraps_pip_even_when_uv_missing(tmp_path):
+    """Installing pip bootstraps pip before attempting uv installation."""
+    venv_dir = _create_venv_without_pip(tmp_path)
+    script = textwrap.dedent(
+        """
+        import importlib
+        from mixinforge import install_package
+
+        for name in ("pip", "uv"):
+            try:
+                importlib.import_module(name)
+                raise SystemExit(f"{name} unexpectedly available")
+            except ModuleNotFoundError:
+                pass
+
+        try:
+            install_package("pip", use_uv=True, verify_import=False)
+        except RuntimeError:
+            pass
+
+        importlib.invalidate_caches()
+        importlib.import_module("pip")
+        """
+    )
+    _run_in_venv(venv_dir, script)
 
 
 # Error Handling Tests
