@@ -112,6 +112,8 @@ For development:
 | `find_instances_inside_composite_object(obj, classinfo, deep_search=True)` | Find instances of type(s) in composite |
 | `transform_instances_inside_composite_object(obj, classinfo, fn)` | Transform instances of type(s) in composite |
 | `is_executed_in_notebook()` | Detect if running in Jupyter/IPython notebook |
+| `install_package(name, ...)` | Install a Python package from PyPI at runtime |
+| `uninstall_package(name, ...)` | Remove a Python package from the environment |
 
 ### Context Managers
 
@@ -312,6 +314,22 @@ structural transformations.
   sorted alphabetically, useful for consistent serialization and
   comparison
 
+### Package Management
+
+Tools for runtime package installation and removal:
+
+- **`install_package(package_name, upgrade=False, version=None, use_uv=True, import_name=None, verify_import=True)`** —
+  Install a Python package from PyPI into the current environment. Supports version pinning,
+  upgrade mode, and handles packages where PyPI name differs from import name (e.g., "Pillow" vs "PIL").
+  Uses `uv` by default for speed, falling back to `pip` when needed.
+
+- **`uninstall_package(package_name, use_uv=True, import_name=None, verify_uninstall=True)`** —
+  Remove a Python package from the current environment. Protects critical package managers
+  (pip, uv) from accidental removal. Verifies complete removal by default.
+
+These functions automatically bootstrap missing package managers and invalidate Python's
+import caches after operations to ensure the import system reflects filesystem changes.
+
 ## Context Managers
 
 ### OutputCapturer
@@ -435,11 +453,11 @@ total size freed.
 <!-- MIXINFORGE_STATS_START -->
 | Metric | Main code | Unit Tests | Total |
 |--------|-----------|------------|-------|
-| Lines Of Code (LOC) | 4419 | 11357 | 15776 |
-| Source Lines Of Code (SLOC) | 1960 | 6547 | 8507 |
+| Lines Of Code (LOC) | 4651 | 11691 | 16342 |
+| Source Lines Of Code (SLOC) | 2077 | 6743 | 8820 |
 | Classes | 20 | 203 | 223 |
-| Functions / Methods | 150 | 959 | 1109 |
-| Files | 25 | 82 | 107 |
+| Functions / Methods | 154 | 982 | 1136 |
+| Files | 26 | 83 | 109 |
 <!-- MIXINFORGE_STATS_END -->
 
 ## Development

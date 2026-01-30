@@ -3,7 +3,8 @@
 This package provides reusable mixins, context managers, and utility functions that
 help you build well-structured Python classes. It offers tools for parameter management,
 cache management, initialization control, thread safety, pickle prevention, JSON
-serialization, nested collection processing, dictionary utilities, and output capturing.
+serialization, nested collection processing, dictionary utilities, output capturing,
+and runtime package management.
 
 Public API:
 - ParameterizableMixin: Base class for parameterizable objects with JSON serialization.
@@ -27,6 +28,8 @@ Public API:
 - transform_instances_inside_composite_object: Transform instances of type(s) in composite structures. Supports deep (handles cycles) or shallow search.
 - is_executed_in_notebook: Detect if running in Jupyter/IPython notebook.
 - reset_notebook_detection: Clear cached notebook detection result.
+- install_package: Install a Python package from PyPI into the current environment.
+- uninstall_package: Remove a Python package from the current environment.
 """
 
 from ._version_info import __version__
@@ -47,11 +50,13 @@ from .utility_functions import (
     dumpjs,
     flatten_nested_collection,
     find_instances_inside_composite_object,
+    install_package,
     transform_instances_inside_composite_object,
     is_executed_in_notebook,
     loadjs,
     reset_notebook_detection,
     sort_dict_by_keys,
+    uninstall_package,
     update_jsparams,
 )
 
@@ -72,10 +77,12 @@ __all__ = [
     'dumpjs',
     'flatten_nested_collection',
     'find_instances_inside_composite_object',
+    'install_package',
     'transform_instances_inside_composite_object',
     'is_executed_in_notebook',
     'loadjs',
     'reset_notebook_detection',
     'sort_dict_by_keys',
+    'uninstall_package',
     'update_jsparams',
 ]

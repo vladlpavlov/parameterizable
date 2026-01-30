@@ -36,6 +36,7 @@ classifiers = [
 
 dependencies = [
     "tabulate",
+    "uv"
 ]
 
 [project.optional-dependencies]
@@ -57,7 +58,7 @@ dev = [
     "sphinx-copybutton",
     "myst-parser",
     "uv-publish",
-    "ruff"
+    "ruff",
 ]
 
 
