@@ -11,6 +11,7 @@ protects critical tools (pip, uv) from accidental removal.
 
 import subprocess
 import importlib
+import importlib.metadata as importlib_metadata
 import sys
 import re
 from functools import cache
@@ -205,13 +206,13 @@ def uninstall_package(package_name: str,
         use_uv: Whether to use uv instead of pip as uninstaller.
         import_name: Module name for verification when it differs from
             package_name (e.g., "PIL" for "Pillow" package).
-        verify_uninstall: Whether to verify package is no longer importable
-            after removal.
+        verify_uninstall: Whether to verify the package distribution is no
+            longer installed after removal.
 
     Raises:
         ValueError: If attempting to uninstall protected packages (pip, uv).
-        RuntimeError: If uninstall command fails or package remains importable
-            after uninstallation when verify_uninstall is True.
+        RuntimeError: If uninstall command fails or the package distribution
+            remains installed after uninstallation when verify_uninstall is True.
     """
     _validate_package_args(
         package_name=package_name,
@@ -240,10 +241,10 @@ def uninstall_package(package_name: str,
 
     if verify_uninstall:
         try:
-            package = importlib.import_module(module_to_check)
-            importlib.reload(package)
-            raise RuntimeError(
-                f"Package '{package_name}' (module '{module_to_check}') "
-                "still importable after uninstallation")
-        except ModuleNotFoundError:
+            importlib_metadata.distribution(package_name)
+        except importlib_metadata.PackageNotFoundError:
             pass
+        else:
+            raise RuntimeError(
+                f"Package '{package_name}' is still installed after uninstallation"
+            )
