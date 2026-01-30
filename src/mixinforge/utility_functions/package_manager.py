@@ -43,6 +43,32 @@ def _run(command: list[str], timeout: int = 300) -> None:
     importlib.invalidate_caches()
 
 
+def _validate_package_args(
+        package_name: str,
+        import_name: str | None = None,
+        version: str | None = None,
+) -> None:
+    if not package_name or not isinstance(package_name, str):
+        raise ValueError("package_name must be a non-empty string")
+
+    if len(package_name) == 1:
+        if not re.match(r'^[A-Za-z0-9]$', package_name):
+            raise ValueError(f"Invalid package name format: {package_name}")
+    elif not re.match(r'^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$', package_name):
+        raise ValueError(f"Invalid package name format: {package_name}")
+
+    if version is not None and not isinstance(version, str):
+        raise ValueError("version must be a string")
+
+    if version is not None and not re.match(r'^[\w\.\-\+\*,<>=!\s]+$', version):
+        raise ValueError(f"Invalid version format: {version}")
+
+    if (import_name is not None
+            and (not isinstance(import_name, str)
+                    or len(import_name) == 0)):
+        raise ValueError("import_name must be a non-empty string")
+
+
 @cache
 def _install_uv_and_pip() -> None:
     """Ensure both package managers are available for installation.
@@ -119,25 +145,11 @@ def install_package(package_name: str,
         >>> install_package("Pillow", import_name="PIL")
         >>> install_package("black", verify_import=False)
     """
-    if not package_name or not isinstance(package_name, str):
-        raise ValueError("package_name must be a non-empty string")
-
-    if len(package_name) == 1:
-        if not re.match(r'^[A-Za-z0-9]$', package_name):
-            raise ValueError(f"Invalid package name format: {package_name}")
-    elif not re.match(r'^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$', package_name):
-        raise ValueError(f"Invalid package name format: {package_name}")
-
-    if version is not None and not isinstance(version, str):
-        raise ValueError("version must be a string")
-
-    if version is not None and not re.match(r'^[\w\.\-\+\*,<>=!\s]+$', version):
-        raise ValueError(f"Invalid version format: {version}")
-
-    if (import_name is not None
-            and (not isinstance(import_name, str)
-                    or len(import_name) == 0)):
-        raise ValueError("import_name must be a non-empty string")
+    _validate_package_args(
+        package_name=package_name,
+        import_name=import_name,
+        version=version,
+    )
 
     if package_name == "pip" and not use_uv:
         raise ValueError("pip must be installed using uv (use_uv=True)")
@@ -188,9 +200,10 @@ def uninstall_package(package_name: str,
         RuntimeError: If uninstall command fails or package remains importable
             after uninstallation when verify_uninstall is True.
     """
-
-    if not package_name or not isinstance(package_name, str):
-        raise ValueError("package_name must be a non-empty string")
+    _validate_package_args(
+        package_name=package_name,
+        import_name=import_name,
+    )
 
     if package_name in ["pip", "uv"]:
         raise ValueError(f"Cannot uninstall '{package_name}' "

@@ -12,9 +12,35 @@ from mixinforge import (
     install_package,
     uninstall_package,
 )
+from mixinforge.utility_functions.package_manager import _validate_package_args
 
 
 # Validation Tests
+
+def test_validate_package_args_accepts_valid_inputs():
+    """Verify shared validation accepts valid inputs."""
+    _validate_package_args("requests")
+    _validate_package_args("requests", import_name="requests")
+    _validate_package_args("requests", version="1.2.3")
+
+
+def test_validate_package_args_rejects_empty_import_name():
+    """Verify shared validation rejects empty import_name."""
+    with pytest.raises(ValueError, match="import_name must be"):
+        _validate_package_args("requests", import_name="")
+
+
+def test_validate_package_args_rejects_invalid_package_name():
+    """Verify shared validation rejects malformed package name."""
+    with pytest.raises(ValueError, match="Invalid package name format"):
+        _validate_package_args("package@name")
+
+
+def test_validate_package_args_rejects_invalid_version():
+    """Verify shared validation rejects invalid version specifier."""
+    with pytest.raises(ValueError, match="Invalid version format"):
+        _validate_package_args("requests", version="version;rm -rf /")
+
 
 @pytest.mark.parametrize("invalid_name", [
     "",
