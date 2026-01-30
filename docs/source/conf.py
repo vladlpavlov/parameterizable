@@ -9,6 +9,8 @@ import sys
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+from mixinforge import __version__
+
 project = 'mixinforge'
 copyright = '2025-2026 Vlad (Volodymyr) Pavlov'
 author = 'Vlad (Volodymyr) Pavlov'
@@ -16,7 +18,6 @@ author = 'Vlad (Volodymyr) Pavlov'
 sys.path.insert(0, os.path.abspath('../../src'))
 
 # Version from package
-from mixinforge import __version__  # noqa: E402
 version = release = __version__
 
 
