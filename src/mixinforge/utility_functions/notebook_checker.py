@@ -14,13 +14,11 @@ __all__ = ['is_executed_in_notebook', 'reset_notebook_detection']
 def is_executed_in_notebook() -> bool:
     """Return whether code is running inside a Jupyter/IPython notebook.
 
-    Uses a lightweight heuristic: checks if IPython is present and whether the
-    current shell exposes the set_custom_exc attribute, which is specific to
-    IPython interactive environments (including Jupyter). The function is cached
-    to avoid repeated imports and checks.
+    Uses a lightweight heuristic checking for IPython presence and specific
+    attributes. Cached to avoid repeated imports.
 
     Returns:
-        bool: True if running inside a Jupyter/IPython notebook, False otherwise.
+        True if running inside a notebook.
     """
 
     try:
@@ -34,8 +32,6 @@ def is_executed_in_notebook() -> bool:
 def reset_notebook_detection() -> None:
     """Clear the cached result of is_executed_in_notebook().
 
-    Call this function to force re-detection of the notebook environment
-    on the next call to is_executed_in_notebook(). Useful for testing
-    or when the execution environment may have changed.
+    Forces re-detection on next call (useful for testing).
     """
     is_executed_in_notebook.cache_clear()

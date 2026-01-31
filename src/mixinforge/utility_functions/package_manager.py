@@ -1,12 +1,7 @@
 """Runtime package management for dynamic dependency installation.
 
 Provides safe, synchronous installation and uninstallation of Python packages
-within a running interpreter. This enables autonomous code portals to acquire
-dependencies on-demand without manual intervention.
-
-Prefers uv as the installer frontend for speed and reliability, falling back
-to pip when needed. Automatically bootstraps missing package managers and
-protects critical tools (pip, uv) from accidental removal.
+within a running interpreter. Prefers uv, falls back to pip.
 """
 
 import subprocess
@@ -35,15 +30,14 @@ _REQUIREMENT_AT_PATTERN: Final[re.Pattern[str]] = re.compile(r"\s+@\s+\S+")
 def _run(command: list[str], timeout: int = 300) -> None:
     """Execute a package management command with timeout protection.
 
-    Automatically invalidates import caches after successful execution to ensure
-    Python's import system reflects filesystem changes from package operations.
+    Automatically invalidates import caches after execution.
 
     Args:
-        command: Command and arguments to execute.
-        timeout: Maximum execution time in seconds.
+        command: Command to execute.
+        timeout: Max time in seconds.
 
     Raises:
-        RuntimeError: If command times out or fails with non-zero exit code.
+        RuntimeError: If command fails or times out.
     """
     try:
         subprocess.run(command, check=True, stdout=subprocess.PIPE
@@ -60,11 +54,7 @@ def _run(command: list[str], timeout: int = 300) -> None:
 
 
 def _is_module_available(module_name: str) -> bool:
-    """Check if a module is available without importing it.
-
-    Uses importlib.util.find_spec to avoid side effects from actually
-    importing the module (e.g., initialization code, sys.modules pollution).
-    """
+    """Check if a module is available (avoids importing it)."""
     return importlib.util.find_spec(module_name) is not None
 
 
@@ -74,7 +64,7 @@ def _validate_package_args(
         version: str | None = None,
         allow_requirement: bool = False,
 ) -> None:
-    """Validates package installation arguments for consistency.
+    """Validate package installation arguments.
 
     Args:
         package_name: PyPI package name or requirement string.
@@ -83,7 +73,7 @@ def _validate_package_args(
         allow_requirement: Whether package_name can contain PEP 508 specifiers.
 
     Raises:
-        ValueError: If arguments are invalid or mutually exclusive.
+        ValueError: If arguments are invalid.
     """
     _validate_package_name(package_name, allow_requirement, version)
     _validate_version(version)
@@ -95,15 +85,15 @@ def _validate_package_name(
         allow_requirement: bool,
         version: str | None,
 ) -> None:
-    """Validates package name format and requirement specifiers.
+    """Validate package name format and specifiers.
 
     Args:
-        package_name: Input string to validate.
-        allow_requirement: Whether to accept full requirement strings.
-        version: Explicit version, incompatible with requirement markers.
+        package_name: Input string.
+        allow_requirement: Accept requirement strings.
+        version: Explicit version (incompatible with markers).
 
     Raises:
-        ValueError: If name format is invalid or version conflicts with requirement.
+        ValueError: If format is invalid or version conflicts.
     """
     if not package_name or not isinstance(package_name, str):
         raise ValueError("package_name must be a non-empty string")
@@ -118,14 +108,14 @@ def _validate_requirement_spec(
         package_name: str,
         version: str | None,
 ) -> None:
-    """Validates structure of PEP 508 requirement strings.
+    """Validate PEP 508 requirement strings.
 
     Args:
-        package_name: Requirement string to parse.
-        version: Explicit version argument (must be None if markers exist).
+        package_name: Requirement string.
+        version: Explicit version (must be None if markers exist).
 
     Raises:
-        ValueError: If requirement syntax is invalid or incompatible with version.
+        ValueError: If invalid.
     """
     base_match = _PACKAGE_BASE_PATTERN.match(package_name)
     if not base_match:
@@ -145,7 +135,7 @@ def _validate_requirement_spec(
 
 
 def _strip_extras(package_name: str, base_end: int) -> str:
-    """Removes extras (e.g., [security]) from a requirement string.
+    """Remove extras from a requirement string.
 
     Args:
         package_name: Full requirement string.
@@ -155,7 +145,7 @@ def _strip_extras(package_name: str, base_end: int) -> str:
         The remaining string after stripping extras blocks.
 
     Raises:
-        ValueError: If extras block format is invalid.
+        ValueError: If extras format is invalid.
     """
     remainder = package_name[base_end:].lstrip()
     if not remainder.startswith("["):
@@ -174,11 +164,11 @@ def _is_valid_requirement_remainder(
     """Checks if the requirement suffix contains valid PEP 508 specifiers.
 
     Args:
-        remainder: The string following the package name (and extras).
-        package_name: Original full package string (for context checks).
+        remainder: Suffix string.
+        package_name: Original full string (for context).
 
     Returns:
-        True if the remainder is a valid version specifier or marker.
+        True if valid.
     """
     if remainder.startswith("@"):
         return _REQUIREMENT_AT_PATTERN.search(package_name) is not None
@@ -316,26 +306,21 @@ def install_package(package_name: str,
     from the import name, and verifies successful installation by default.
 
     Args:
-        package_name: PyPI package name to install.
-        upgrade: Whether to upgrade if package is already installed.
-        version: Version specifier for pinned installation.
-        use_uv: Whether to use uv instead of pip as installer. Note that pip
-            requires use_uv=True and uv requires use_uv=False.
-        import_name: Module name for import verification when it differs from
-            package_name (e.g., "PIL" for "Pillow" package).
-        verify_import: Whether to verify importability after installation.
-            Disable for CLI-only tools without importable modules.
+        package_name: PyPI package name.
+        upgrade: Whether to upgrade.
+        version: Pinned version.
+        use_uv: Use uv (default) or pip.
+        import_name: Module name for verification.
+        verify_import: Check importability.
 
     Raises:
-        ValueError: If package_name or version format is invalid, or if
-            attempting to install pip without uv or uv without pip.
-        RuntimeError: If installation command fails or times out.
-        ModuleNotFoundError: If verify_import is True but import fails.
+        ValueError: If args are invalid.
+        RuntimeError: If installation fails.
+        ModuleNotFoundError: If verification fails.
 
     Example:
         >>> install_package("requests")
         >>> install_package("Pillow", import_name="PIL")
-        >>> install_package("black", verify_import=False)
     """
     _validate_package_args(
         package_name=package_name,
@@ -384,24 +369,17 @@ def uninstall_package(package_name: str,
             ) -> None:
     """Remove a Python package from the current environment.
 
-    Uninstalls packages and verifies complete removal. Protects critical
-    package managers (pip, uv) from accidental deletion to maintain system
-    package management capabilities.
+    Protects critical packages (pip, uv). Verifies removal.
 
     Args:
-        package_name: Package to uninstall. Cannot be pip or uv.
-        use_uv: Whether to use uv instead of pip as uninstaller.
-        import_name: Module name for verification when it differs from
-            package_name (e.g., "PIL" for "Pillow" package).
-        verify_uninstall: Whether to verify the package distribution is no
-            longer installed after removal. If import_name is provided and the
-            package name lookup fails, fallback to resolving distributions
-            providing the import name.
+        package_name: Package to uninstall.
+        use_uv: Use uv (default) or pip.
+        import_name: Module name for verification.
+        verify_uninstall: Check removal.
 
     Raises:
-        ValueError: If attempting to uninstall protected packages (pip, uv).
-        RuntimeError: If uninstall command fails or the package distribution
-            remains installed after uninstallation when verify_uninstall is True.
+        ValueError: If uninstalling protected packages.
+        RuntimeError: If uninstall fails or package remains.
     """
     _validate_package_args(
         package_name=package_name,
