@@ -74,6 +74,17 @@ def _validate_package_args(
         version: str | None = None,
         allow_requirement: bool = False,
 ) -> None:
+    """Validates package installation arguments for consistency.
+
+    Args:
+        package_name: PyPI package name or requirement string.
+        import_name: Expected module name after installation.
+        version: Explicit version specifier (e.g., "1.0.0").
+        allow_requirement: Whether package_name can contain PEP 508 specifiers.
+
+    Raises:
+        ValueError: If arguments are invalid or mutually exclusive.
+    """
     _validate_package_name(package_name, allow_requirement, version)
     _validate_version(version)
     _validate_import_name(import_name)
@@ -84,6 +95,16 @@ def _validate_package_name(
         allow_requirement: bool,
         version: str | None,
 ) -> None:
+    """Validates package name format and requirement specifiers.
+
+    Args:
+        package_name: Input string to validate.
+        allow_requirement: Whether to accept full requirement strings.
+        version: Explicit version, incompatible with requirement markers.
+
+    Raises:
+        ValueError: If name format is invalid or version conflicts with requirement.
+    """
     if not package_name or not isinstance(package_name, str):
         raise ValueError("package_name must be a non-empty string")
 
@@ -97,6 +118,15 @@ def _validate_requirement_spec(
         package_name: str,
         version: str | None,
 ) -> None:
+    """Validates structure of PEP 508 requirement strings.
+
+    Args:
+        package_name: Requirement string to parse.
+        version: Explicit version argument (must be None if markers exist).
+
+    Raises:
+        ValueError: If requirement syntax is invalid or incompatible with version.
+    """
     base_match = _PACKAGE_BASE_PATTERN.match(package_name)
     if not base_match:
         raise ValueError(f"Invalid package name format: {package_name}")
@@ -115,6 +145,18 @@ def _validate_requirement_spec(
 
 
 def _strip_extras(package_name: str, base_end: int) -> str:
+    """Removes extras (e.g., [security]) from a requirement string.
+
+    Args:
+        package_name: Full requirement string.
+        base_end: Index where the base package name ends.
+
+    Returns:
+        The remaining string after stripping extras blocks.
+
+    Raises:
+        ValueError: If extras block format is invalid.
+    """
     remainder = package_name[base_end:].lstrip()
     if not remainder.startswith("["):
         return remainder
@@ -129,12 +171,29 @@ def _is_valid_requirement_remainder(
         remainder: str,
         package_name: str,
 ) -> bool:
+    """Checks if the requirement suffix contains valid PEP 508 specifiers.
+
+    Args:
+        remainder: The string following the package name (and extras).
+        package_name: Original full package string (for context checks).
+
+    Returns:
+        True if the remainder is a valid version specifier or marker.
+    """
     if remainder.startswith("@"):
         return _REQUIREMENT_AT_PATTERN.search(package_name) is not None
     return remainder.startswith(";") or remainder[0] in "<>!=~"
 
 
 def _validate_version(version: str | None) -> None:
+    """Validates the format of an explicit version string.
+
+    Args:
+        version: Version string to check (can be None).
+
+    Raises:
+        ValueError: If version is not a string or has invalid format.
+    """
     if version is None:
         return
 
@@ -146,6 +205,14 @@ def _validate_version(version: str | None) -> None:
 
 
 def _validate_import_name(import_name: str | None) -> None:
+    """Validates the format of the optional import name.
+
+    Args:
+        import_name: Module name to check (can be None).
+
+    Raises:
+        ValueError: If import_name is provided but is empty or not a string.
+    """
     if import_name is None:
         return
 
@@ -154,16 +221,39 @@ def _validate_import_name(import_name: str | None) -> None:
 
 
 def _canonicalize_distribution_name(name: str) -> str:
+    """Canonicalizes a distribution name according to PyPI standards.
+
+    Converts to lowercase and replaces runs of non-alphanumeric characters with
+    a single dash.
+
+    Args:
+        name: Raw distribution name.
+
+    Returns:
+        Canonicalized name string.
+    """
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def _extract_base_package_name(package_name: str) -> str:
+    """Extracts the base package name from a requirement string.
+
+    Args:
+        package_name: Requirement string (e.g., "requests>=2.0").
+
+    Returns:
+        The base name (e.g., "requests") without extras or version specifiers.
+    """
     match = _PACKAGE_BASE_PATTERN.match(package_name)
     return match.group(0) if match else package_name
 
 
 def _ensure_pip_available() -> None:
-    """Ensure pip is available, bootstrapping via uv or ensurepip as needed."""
+    """Ensure pip is available, bootstrapping via uv or ensurepip as needed.
+
+    Raises:
+        RuntimeError: If bootstrapping pip fails.
+    """
     if _is_module_available("pip"):
         return
 
@@ -181,7 +271,11 @@ def _ensure_pip_available() -> None:
 
 
 def _ensure_uv_available() -> None:
-    """Ensure uv is available, bootstrapping via pip as needed."""
+    """Ensure uv is available, bootstrapping via pip as needed.
+
+    Raises:
+        RuntimeError: If bootstrapping uv fails.
+    """
     if _is_module_available("uv"):
         return
 
@@ -195,6 +289,9 @@ def _install_uv_and_pip() -> None:
 
     Bootstraps missing package managers using whichever is available: installs
     uv via pip or pip via uv. Cached to ensure this runs only once per session.
+
+    Raises:
+        RuntimeError: If bootstrapping either package manager fails.
 
     Note:
         Called automatically by install_package for any package except pip
