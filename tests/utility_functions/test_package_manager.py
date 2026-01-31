@@ -68,6 +68,15 @@ def test_validate_package_args_accepts_valid_inputs():
     _validate_package_args("requests")
     _validate_package_args("requests", import_name="requests")
     _validate_package_args("requests", version="1.2.3")
+    _validate_package_args("requests[socks]", allow_requirement=True)
+    _validate_package_args(
+        "requests>=2.0; python_version>='3.8'",
+        allow_requirement=True,
+    )
+    _validate_package_args(
+        "requests @ https://example.com/requests-2.0.0-py3-none-any.whl",
+        allow_requirement=True,
+    )
 
 
 def test_validate_package_args_rejects_empty_import_name():
@@ -80,6 +89,21 @@ def test_validate_package_args_rejects_invalid_package_name():
     """Verify shared validation rejects malformed package name."""
     with pytest.raises(ValueError, match="Invalid package name format"):
         _validate_package_args("package@name")
+
+
+def test_validate_package_args_rejects_invalid_requirement_format():
+    """Verify requirement-style inputs still reject malformed strings."""
+    with pytest.raises(ValueError, match="Invalid requirement format"):
+        _validate_package_args(
+            "requests@https://example.com/requests.whl",
+            allow_requirement=True,
+        )
+    with pytest.raises(ValueError, match="version cannot be combined"):
+        _validate_package_args(
+            "requests>=2.0",
+            version="1.0",
+            allow_requirement=True,
+        )
 
 
 def test_validate_package_args_rejects_invalid_version():

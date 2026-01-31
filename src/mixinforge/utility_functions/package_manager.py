@@ -14,7 +14,22 @@ import importlib
 import importlib.metadata as importlib_metadata
 import sys
 import re
+from typing import Final
 from functools import cache
+
+
+_PACKAGE_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$"
+)
+_PACKAGE_BASE_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?"
+)
+_PACKAGE_EXTRAS_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"^\[[A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*\]"
+)
+_VERSION_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[\w\.\-\+\*,<>=!\s]+$")
+_REQUIREMENT_MARKER_PATTERN: Final[re.Pattern[str]] = re.compile(r"[<>=!~@;]")
+_REQUIREMENT_AT_PATTERN: Final[re.Pattern[str]] = re.compile(r"\s+@\s+\S+")
 
 
 def _run(command: list[str], timeout: int = 300) -> None:
@@ -57,26 +72,94 @@ def _validate_package_args(
         package_name: str,
         import_name: str | None = None,
         version: str | None = None,
+        allow_requirement: bool = False,
+) -> None:
+    _validate_package_name(package_name, allow_requirement, version)
+    _validate_version(version)
+    _validate_import_name(import_name)
+
+
+def _validate_package_name(
+        package_name: str,
+        allow_requirement: bool,
+        version: str | None,
 ) -> None:
     if not package_name or not isinstance(package_name, str):
         raise ValueError("package_name must be a non-empty string")
 
-    if len(package_name) == 1:
-        if not re.match(r'^[A-Za-z0-9]$', package_name):
-            raise ValueError(f"Invalid package name format: {package_name}")
-    elif not re.match(r'^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$', package_name):
+    if allow_requirement:
+        _validate_requirement_spec(package_name, version)
+    elif not _PACKAGE_NAME_PATTERN.match(package_name):
         raise ValueError(f"Invalid package name format: {package_name}")
 
-    if version is not None and not isinstance(version, str):
+
+def _validate_requirement_spec(
+        package_name: str,
+        version: str | None,
+) -> None:
+    base_match = _PACKAGE_BASE_PATTERN.match(package_name)
+    if not base_match:
+        raise ValueError(f"Invalid package name format: {package_name}")
+
+    remainder = _strip_extras(package_name, base_match.end())
+    if remainder and not _is_valid_requirement_remainder(
+            remainder,
+            package_name,
+    ):
+        raise ValueError(f"Invalid requirement format: {package_name}")
+
+    if version is not None and _REQUIREMENT_MARKER_PATTERN.search(package_name):
+        raise ValueError(
+            "version cannot be combined with requirement specifiers"
+        )
+
+
+def _strip_extras(package_name: str, base_end: int) -> str:
+    remainder = package_name[base_end:].lstrip()
+    if not remainder.startswith("["):
+        return remainder
+
+    extras_match = _PACKAGE_EXTRAS_PATTERN.match(remainder)
+    if not extras_match:
+        raise ValueError(f"Invalid extras format: {package_name}")
+    return remainder[extras_match.end():].lstrip()
+
+
+def _is_valid_requirement_remainder(
+        remainder: str,
+        package_name: str,
+) -> bool:
+    if remainder.startswith("@"):
+        return _REQUIREMENT_AT_PATTERN.search(package_name) is not None
+    return remainder.startswith(";") or remainder[0] in "<>!=~"
+
+
+def _validate_version(version: str | None) -> None:
+    if version is None:
+        return
+
+    if not isinstance(version, str):
         raise ValueError("version must be a string")
 
-    if version is not None and not re.match(r'^[\w\.\-\+\*,<>=!\s]+$', version):
+    if not _VERSION_PATTERN.match(version):
         raise ValueError(f"Invalid version format: {version}")
 
-    if (import_name is not None
-            and (not isinstance(import_name, str)
-                    or len(import_name) == 0)):
+
+def _validate_import_name(import_name: str | None) -> None:
+    if import_name is None:
+        return
+
+    if not isinstance(import_name, str) or len(import_name) == 0:
         raise ValueError("import_name must be a non-empty string")
+
+
+def _canonicalize_distribution_name(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _extract_base_package_name(package_name: str) -> str:
+    match = _PACKAGE_BASE_PATTERN.match(package_name)
+    return match.group(0) if match else package_name
 
 
 def _ensure_pip_available() -> None:
@@ -161,6 +244,7 @@ def install_package(package_name: str,
         package_name=package_name,
         import_name=import_name,
         version=version,
+        allow_requirement=True,
     )
 
     if package_name == "pip":
@@ -188,7 +272,11 @@ def install_package(package_name: str,
     _run(command)
 
     if verify_import:
-        module_to_import = import_name if import_name is not None else package_name
+        module_to_import = (
+            import_name
+            if import_name is not None
+            else _extract_base_package_name(package_name)
+        )
         importlib.import_module(module_to_import)
 
 
@@ -259,11 +347,18 @@ def uninstall_package(package_name: str,
                 # Only raise if exactly one distribution provides this import
                 # AND that distribution is different from what we tried to uninstall
                 # (handles case where package_name was an alias)
-                if len(dist_names) == 1 and dist_names[0] != package_name:
-                    raise RuntimeError(
-                        f"Package '{package_name}' appears still installed via "
-                        f"distribution '{dist_names[0]}' for import '{import_name}'"
+                if len(dist_names) == 1:
+                    canonical_requested = _canonicalize_distribution_name(
+                        package_name
                     )
+                    canonical_found = _canonicalize_distribution_name(
+                        dist_names[0]
+                    )
+                    if canonical_found != canonical_requested:
+                        raise RuntimeError(
+                            f"Package '{package_name}' appears still installed via "
+                            f"distribution '{dist_names[0]}' for import '{import_name}'"
+                        )
         else:
             raise RuntimeError(
                 f"Package '{package_name}' is still installed after uninstallation"

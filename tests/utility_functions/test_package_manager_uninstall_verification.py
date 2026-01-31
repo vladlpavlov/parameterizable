@@ -146,6 +146,7 @@ def test_uninstall_verification_passes_when_same_distribution_found():
     """
     package_name = "my-package"
     import_name = "my_module"
+    dist_name = "My_Package"
 
     with patch(
         "mixinforge.utility_functions.package_manager._install_uv_and_pip"
@@ -162,8 +163,8 @@ def test_uninstall_verification_passes_when_same_distribution_found():
         mock_distribution.side_effect = importlib_metadata.PackageNotFoundError(
             package_name
         )
-        # But packages_distributions returns the SAME package_name (not a different one)
-        mock_packages_distributions.return_value = {import_name: [package_name]}
+        # But packages_distributions returns a canonical-equivalent name
+        mock_packages_distributions.return_value = {import_name: [dist_name]}
 
         # Should NOT raise because dist_names[0] == package_name
         uninstall_package(
