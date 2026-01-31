@@ -22,9 +22,14 @@ def _pip_env() -> dict[str, str]:
     return env
 
 
-def _write_local_package(package_dir: Path, package_name: str) -> None:
+def _write_local_package(
+    package_dir: Path,
+    dist_name: str,
+    module_name: str | None = None,
+) -> None:
+    module_name = module_name or dist_name
     package_dir.mkdir(parents=True, exist_ok=True)
-    (package_dir / f"{package_name}.py").write_text(
+    (package_dir / f"{module_name}.py").write_text(
         "VALUE = 1\n",
         encoding="ascii",
     )
@@ -33,9 +38,9 @@ def _write_local_package(package_dir: Path, package_name: str) -> None:
         from setuptools import setup
 
         setup(
-            name="{package_name}",
+            name="{dist_name}",
             version="0.0.0",
-            py_modules=["{package_name}"],
+            py_modules=["{module_name}"],
         )
         """
     ).lstrip()
@@ -99,3 +104,27 @@ def test_uninstall_verification_ignores_stdlib_import_name(tmp_path):
         importlib_metadata.distribution(package_name)
 
     assert json.dumps({"still": "there"}) == '{"still": "there"}'
+
+
+def test_uninstall_verification_falls_back_to_import_name(tmp_path):
+    """Verify uninstall fails when package_name is an alias for the import name."""
+    pytest.importorskip("setuptools")
+    dist_name = "mf-alias-dist"
+    module_name = "mf_alias_mod"
+    package_dir = tmp_path / dist_name
+    _write_local_package(package_dir, dist_name, module_name)
+    _pip_install_local(package_dir)
+
+    try:
+        assert importlib_metadata.distribution(dist_name) is not None
+        with pytest.raises(RuntimeError):
+            uninstall_package(
+                module_name,
+                import_name=module_name,
+                verify_uninstall=True,
+            )
+    finally:
+        _pip_uninstall(dist_name)
+
+    with pytest.raises(importlib_metadata.PackageNotFoundError):
+        importlib_metadata.distribution(dist_name)

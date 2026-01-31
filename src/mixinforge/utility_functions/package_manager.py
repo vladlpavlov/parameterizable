@@ -207,7 +207,9 @@ def uninstall_package(package_name: str,
         import_name: Module name for verification when it differs from
             package_name (e.g., "PIL" for "Pillow" package).
         verify_uninstall: Whether to verify the package distribution is no
-            longer installed after removal.
+            longer installed after removal. If import_name is provided and the
+            package name lookup fails, fallback to resolving distributions
+            providing the import name.
 
     Raises:
         ValueError: If attempting to uninstall protected packages (pip, uv).
@@ -243,7 +245,17 @@ def uninstall_package(package_name: str,
         try:
             importlib_metadata.distribution(package_name)
         except importlib_metadata.PackageNotFoundError:
-            pass
+            if import_name:
+                top_level_name = import_name.split(".", 1)[0]
+                dist_names = importlib_metadata.packages_distributions().get(
+                    top_level_name,
+                    [],
+                )
+                if len(dist_names) == 1:
+                    raise RuntimeError(
+                        f"Package '{package_name}' appears still installed via "
+                        f"distribution '{dist_names[0]}' for import '{import_name}'"
+                    )
         else:
             raise RuntimeError(
                 f"Package '{package_name}' is still installed after uninstallation"
