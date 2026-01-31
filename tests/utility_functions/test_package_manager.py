@@ -404,7 +404,6 @@ def test_install_with_verification_detects_missing_module():
 def test_uninstall_with_verification_detects_remaining_distribution():
     """Verify uninstall fails if distribution still present after removal."""
     from unittest.mock import patch, MagicMock
-    import importlib.metadata as importlib_metadata
 
     package = "fake-still-installed"
 
