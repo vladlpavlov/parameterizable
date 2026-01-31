@@ -45,11 +45,12 @@ def _run(command: list[str], timeout: int = 300) -> None:
 
 
 def _is_module_available(module_name: str) -> bool:
-    try:
-        importlib.import_module(module_name)
-        return True
-    except ModuleNotFoundError:
-        return False
+    """Check if a module is available without importing it.
+
+    Uses importlib.util.find_spec to avoid side effects from actually
+    importing the module (e.g., initialization code, sys.modules pollution).
+    """
+    return importlib.util.find_spec(module_name) is not None
 
 
 def _validate_package_args(
@@ -114,7 +115,8 @@ def _install_uv_and_pip() -> None:
 
     Note:
         Called automatically by install_package for any package except pip
-        or uv themselves.
+        or uv themselves. Use `_install_uv_and_pip.cache_clear()` to reset
+        the cached state if the environment changes (e.g., in tests).
     """
     _ensure_pip_available()
     _ensure_uv_available()
@@ -242,6 +244,9 @@ def uninstall_package(package_name: str,
         del sys.modules[mod]
 
     if verify_uninstall:
+        # Invalidate import caches to ensure fresh lookups after uninstall
+        importlib.invalidate_caches()
+
         try:
             importlib_metadata.distribution(package_name)
         except importlib_metadata.PackageNotFoundError:
@@ -251,7 +256,10 @@ def uninstall_package(package_name: str,
                     top_level_name,
                     [],
                 )
-                if len(dist_names) == 1:
+                # Only raise if exactly one distribution provides this import
+                # AND that distribution is different from what we tried to uninstall
+                # (handles case where package_name was an alias)
+                if len(dist_names) == 1 and dist_names[0] != package_name:
                     raise RuntimeError(
                         f"Package '{package_name}' appears still installed via "
                         f"distribution '{dist_names[0]}' for import '{import_name}'"
