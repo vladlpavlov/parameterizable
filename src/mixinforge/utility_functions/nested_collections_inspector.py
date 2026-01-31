@@ -20,7 +20,7 @@ ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
 
 
 def _is_valid_classinfo(classinfo: Any) -> bool:
-    """Check if classinfo is valid for isinstance() usage.
+    """Check if classinfo is valid for isinstance().
 
     Args:
         classinfo: Value to validate.
@@ -46,7 +46,7 @@ def _get_all_slots(cls: type) -> list[str]:
         cls: Class to inspect.
 
     Returns:
-        Slot names from all base classes, excluding __dict__ and __weakref__.
+        Slot names from all base classes (excluding __dict__, __weakref__).
     """
     slots = []
     seen = set()
@@ -85,7 +85,7 @@ _MISSING: Final = object()  # private sentinel
 
 
 def _yield_attributes(obj: Any) -> Iterator[Any]:
-    """Safely yield attribute values from an object's __dict__ and/or __slots__.
+    """Safely yield attribute values from __dict__ and __slots__.
 
     Attributes from ``__dict__`` are yielded as-is. For ``__slots__``,
     descriptors are checked before access to avoid triggering side effects
@@ -156,7 +156,7 @@ def _get_children_from_object(obj: Any) -> Iterator[Any]:
         obj: Object to extract children from.
 
     Returns:
-        Iterator of child objects to traverse.
+        Iterator of child objects.
     """
     if is_atomic_object(obj):
         return iter(())
@@ -169,9 +169,6 @@ def _get_children_from_object(obj: Any) -> Iterator[Any]:
 
     if isinstance(obj, Mapping):
         # Optimization: treat as standard mapping if no instance attributes
-        # (avoid overhead of chaining generators if __dict__ is empty and no __slots__)
-        # This is critical for performance when traversing deep structures of
-        # dict subclasses (like KwArgs in Pythagoras) to avoid massive slowdowns.
         if (isinstance(obj, dict)
                 and not hasattr(obj.__class__, "__slots__")
                 and hasattr(obj, "__dict__")
@@ -193,7 +190,7 @@ def _is_traversable_collection(obj: Any) -> bool:
         obj: Object to check.
 
     Returns:
-        True to traverse inside, False to yield as atomic.
+        True if traversable.
     """
     if is_atomic_object(obj):
         return False
@@ -228,10 +225,10 @@ def _traverse(root: Any, get_children_fn: Callable[[Any], Optional[Iterator[Any]
         obj_id = id(current)
         if obj_id in seen_ids:
             continue
-            
+
         seen_ids.add(obj_id)
         yield current
-        
+
         children = get_children_fn(current)
         if children is not None:
             stack.append(children)
@@ -250,10 +247,10 @@ def flatten_nested_collection(obj: Iterable[Any]) -> Iterator[Any]:
     Mapping keys and values are both traversed.
 
     Args:
-        obj: The root collection to traverse.
+        obj: The root collection.
 
     Yields:
-        Atomic elements in depth-first order, deduplicated by identity.
+        Leaf elements in depth-first order, deduplicated by identity.
 
     Raises:
         TypeError: If obj is not an iterable.
@@ -304,8 +301,7 @@ def find_instances_inside_composite_object(
         Instances matching classinfo in depth-first order, deduplicated by identity.
 
     Raises:
-        TypeError: If classinfo is not a valid type specification (must be a
-            type, tuple of types, or union type).
+        TypeError: If classinfo is invalid.
     """
     if not _is_valid_classinfo(classinfo):
         raise TypeError(

@@ -1,7 +1,7 @@
 """Reconstruction and transformation of nested composite objects.
 
-Provides functionality to transform specific instances within deeply nested
-structures while preserving the overall object graph and handling cycles.
+Transforms specific instances within deeply nested structures while
+preserving the object graph and handling cycles.
 """
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping, Callable
@@ -22,7 +22,7 @@ T = TypeVar('T')
 # Internal helpers
 # ==============================================================================
 def _safe_recreate_container(original_type: type, items: Iterable[Any], *, original: Any = None) -> Any:
-    """Best-effort reconstruction that won't explode for exotic containers.
+    """Best-effort reconstruction for containers.
 
     Args:
         original_type: The type to recreate.
@@ -61,7 +61,7 @@ def _copy_instance_attributes(source: Any, target: Any) -> None:
 
 
 def _create_dict_subclass_copy(original: dict) -> dict:
-    """Create a copy of a dict subclass, bypassing __init__ and copying attributes."""
+    """Copy a dict subclass instance, bypassing __init__."""
     original_type = type(original)
     result = original_type.__new__(original_type)
     dict.update(result, original)
@@ -74,7 +74,7 @@ def _create_dict_subclass_copy(original: dict) -> dict:
 # ==============================================================================
 
 class _ObjectReconstructor:
-    """Helper class for recursive object reconstruction with cycle handling."""
+    """Recursive object reconstruction with cycle handling."""
 
     def __init__(self, classinfo: ClassInfo, transform_fn: Callable[[Any], Any], deep_transformation: bool = True):
         self.classinfo = classinfo
@@ -117,7 +117,11 @@ class _ObjectReconstructor:
                 return self._reconstruct_custom_object(original, obj_id)
 
     def _reconstruct_mapping_items(self, original: Mapping) -> tuple[bool, list[tuple[Any, Any]]]:
-        """Reconstruct all key-value pairs, returning (changed, new_items)."""
+        """Reconstruct key-value pairs.
+
+        Returns:
+             Tuple of (changed_flag, new_items).
+        """
         changed = False
         new_items = []
         for k, v in original.items():
@@ -129,7 +133,11 @@ class _ObjectReconstructor:
         return changed, new_items
 
     def _reconstruct_iterable_items(self, original: Iterable) -> tuple[bool, list[Any]]:
-        """Reconstruct all items, returning (changed, new_items)."""
+        """Reconstruct items.
+
+        Returns:
+            Tuple of (changed_flag, new_items).
+        """
         changed = False
         new_items = []
         for item in original:
@@ -309,33 +317,20 @@ def transform_instances_inside_composite_object(
 ) -> Any:
     """Transform all instances of a target type within any object.
 
-    Performs traversal of iterables, mappings, and custom objects
-    (via __dict__ and __slots__). Transforms all instances matching classinfo
-    using transform_fn and reconstructs the composite object with the
-    transformed instances.
-
-    If no matching instances are found, returns the original object unchanged.
-
-    Handles cycles gracefully: each object is transformed only once, and
-    cycle structure is preserved in the result.
-
-    Mapping keys and values are both traversed and can be transformed.
+    Traverses collections and custom objects. Transforms matching instances
+    and reconstructs the composite object. Handles cycles.
 
     Args:
-        obj: The object to search within and transform.
-        classinfo: Type or tuple of types to search for and transform. Accepts
-            the same values as the second argument to isinstance(): a single
-            type, a tuple of types (recursively), or a union type (e.g., int | str).
-        transform_fn: Function to apply to each matching instance.
-            Should be idempotent (return the same result for the same input)
-            since objects are deduplicated by identity and the function is
-            called only once per unique object.
-        deep_transformation: If True (default), after transforming an instance,
-            continue recursively processing its children for more matching
-            instances. If False, stop traversal at transformed instances.
+        obj: The object to transform.
+        classinfo: Type(s) to search for and transform.
+        transform_fn: Function to apply to matching instances.
+        deep_transformation: If True, recursively transform inside result.
 
     Returns:
-        The transformed composite object, or the original if no matches found.
+        The transformed object (or original if unchanged).
+
+    Raises:
+        TypeError: If classinfo is invalid.
     """
 
     if not _is_valid_classinfo(classinfo):
