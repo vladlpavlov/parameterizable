@@ -27,6 +27,8 @@ def test_uninstall_verification_ignores_stdlib_import_name():
     ), patch(
         "mixinforge.utility_functions.package_manager._run"
     ), patch(
+        "mixinforge.utility_functions.package_manager.importlib.invalidate_caches"
+    ), patch(
         "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
     ) as mock_distribution, patch(
         "mixinforge.utility_functions.package_manager.importlib_metadata.packages_distributions"
@@ -61,6 +63,8 @@ def test_uninstall_verification_falls_back_to_import_name():
     ), patch(
         "mixinforge.utility_functions.package_manager._run"
     ), patch(
+        "mixinforge.utility_functions.package_manager.importlib.invalidate_caches"
+    ), patch(
         "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
     ) as mock_distribution, patch(
         "mixinforge.utility_functions.package_manager.importlib_metadata.packages_distributions"
@@ -70,6 +74,7 @@ def test_uninstall_verification_falls_back_to_import_name():
             module_name
         )
         # But the import_name maps to exactly one distribution (the real dist_name)
+        # which is DIFFERENT from the package_name we tried to uninstall
         mock_packages_distributions.return_value = {module_name: [dist_name]}
 
         with pytest.raises(RuntimeError) as exc_info:
@@ -91,6 +96,8 @@ def test_uninstall_verification_passes_when_distribution_not_found():
         "mixinforge.utility_functions.package_manager._install_uv_and_pip"
     ), patch(
         "mixinforge.utility_functions.package_manager._run"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib.invalidate_caches"
     ), patch(
         "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
     ) as mock_distribution:
@@ -114,6 +121,8 @@ def test_uninstall_verification_fails_when_distribution_still_exists():
     ), patch(
         "mixinforge.utility_functions.package_manager._run"
     ), patch(
+        "mixinforge.utility_functions.package_manager.importlib.invalidate_caches"
+    ), patch(
         "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
     ) as mock_distribution:
         # Distribution still exists after uninstall attempt
@@ -126,3 +135,75 @@ def test_uninstall_verification_fails_when_distribution_still_exists():
             )
 
         assert "still installed after uninstallation" in str(exc_info.value)
+
+
+def test_uninstall_verification_passes_when_same_distribution_found():
+    """Verify uninstall passes when packages_distributions returns the same package_name.
+
+    If the package was successfully uninstalled (distribution() raises PackageNotFoundError)
+    but packages_distributions() still shows the same package_name for the import_name,
+    this is likely stale cache data and should not trigger a failure.
+    """
+    package_name = "my-package"
+    import_name = "my_module"
+
+    with patch(
+        "mixinforge.utility_functions.package_manager._install_uv_and_pip"
+    ), patch(
+        "mixinforge.utility_functions.package_manager._run"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib.invalidate_caches"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
+    ) as mock_distribution, patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.packages_distributions"
+    ) as mock_packages_distributions:
+        # Package distribution not found (successfully uninstalled)
+        mock_distribution.side_effect = importlib_metadata.PackageNotFoundError(
+            package_name
+        )
+        # But packages_distributions returns the SAME package_name (not a different one)
+        mock_packages_distributions.return_value = {import_name: [package_name]}
+
+        # Should NOT raise because dist_names[0] == package_name
+        uninstall_package(
+            package_name,
+            import_name=import_name,
+            verify_uninstall=True,
+        )
+
+
+def test_uninstall_verification_passes_when_multiple_distributions_found():
+    """Verify uninstall passes when multiple distributions provide the import.
+
+    If multiple distributions provide the same import_name, we can't determine
+    which one was the target, so we don't raise an error.
+    """
+    package_name = "my-package"
+    import_name = "shared_module"
+
+    with patch(
+        "mixinforge.utility_functions.package_manager._install_uv_and_pip"
+    ), patch(
+        "mixinforge.utility_functions.package_manager._run"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib.invalidate_caches"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
+    ) as mock_distribution, patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.packages_distributions"
+    ) as mock_packages_distributions:
+        mock_distribution.side_effect = importlib_metadata.PackageNotFoundError(
+            package_name
+        )
+        # Multiple distributions provide this import - ambiguous, so don't raise
+        mock_packages_distributions.return_value = {
+            import_name: ["dist-a", "dist-b"]
+        }
+
+        # Should NOT raise because len(dist_names) != 1
+        uninstall_package(
+            package_name,
+            import_name=import_name,
+            verify_uninstall=True,
+        )

@@ -401,33 +401,27 @@ def test_install_with_verification_detects_missing_module():
     pass
 
 
-def test_uninstall_with_verification_detects_remaining_module():
-    """Verify uninstall fails if module still importable after removal."""
-    # This tests the safety check that ensures package was truly removed
-    package = "nothing"
+def test_uninstall_with_verification_detects_remaining_distribution():
+    """Verify uninstall fails if distribution still present after removal."""
+    from unittest.mock import patch, MagicMock
+    import importlib.metadata as importlib_metadata
 
-    try:
-        uninstall_package(package, verify_uninstall=False)
-    except RuntimeError:
-        pass
+    package = "fake-still-installed"
 
-    try:
-        install_package(package, verify_import=True)
+    with patch(
+        "mixinforge.utility_functions.package_manager._install_uv_and_pip"
+    ), patch(
+        "mixinforge.utility_functions.package_manager._run"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib.invalidate_caches"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
+    ) as mock_distribution:
+        # Simulate distribution still exists after uninstall attempt
+        mock_distribution.return_value = MagicMock()
 
-        # Artificially keep module in sys.modules to trigger verification failure
-        import nothing
-        assert nothing
-        _original_module = sys.modules[package]
-
-        # Mock the uninstall to not actually remove it (we can't easily test this)
-        # This is a white-box test of verification logic
-        uninstall_package(package, verify_uninstall=True)
-    finally:
-        # Ensure cleanup even if test fails
-        try:
-            uninstall_package(package, verify_uninstall=False)
-        except Exception:
-            pass
+        with pytest.raises(RuntimeError, match="still installed after uninstallation"):
+            uninstall_package(package, verify_uninstall=True)
 
 
 # Edge Cases
