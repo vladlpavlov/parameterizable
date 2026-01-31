@@ -1,7 +1,6 @@
 """Utility for sorting dictionaries by keys.
 
-This module provides a simple helper function for creating sorted dictionaries,
-which is useful for ensuring consistent ordering in serialization and display.
+Ensures consistent ordering for serialization and display.
 """
 from typing import Any
 
@@ -10,11 +9,10 @@ def sort_dict_by_keys(d: dict[str, Any]) -> dict[str, Any]:
     """Return a new dictionary with keys sorted alphabetically.
 
     Args:
-        d: The input mapping to sort by keys.
+        d: The input dictionary.
 
     Returns:
-        A new dictionary containing the same key-value pairs as
-        d, but with keys in ascending alphabetical order.
+        A new dictionary with sorted keys.
 
     Raises:
         TypeError: If d is not a dictionary.

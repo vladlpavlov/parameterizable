@@ -176,7 +176,7 @@ class _LazyTypeRegistry:
             type_spec: The type to check.
 
         Returns:
-            True if the type is registered, False otherwise.
+            True if the type is registered.
 
         Raises:
             TypeError: If the query type cannot be imported.

@@ -36,17 +36,14 @@ class _Markers:
     types and object metadata while still producing a JSON-compatible structure.
 
     Attributes:
-        DICT: Marker for dictionaries to ensure all keys are strings and values
-            are JSON-serializable.
-        TUPLE: Marker key for tuple values. The value is a list of items.
-        SET: Marker key for set values. The value is a list of items.
-        ENUM: Marker key for Enum members. The value is the member name.
-        CLASS: Name of the object's class used during reconstruction.
-        MODULE: Name of the module where the object's class is defined.
-        PARAMS: Serialized mapping of constructor parameters for get_params-
-            based reconstruction.
-        STATE: Serialized state for __getstate__/__setstate__-based
-            reconstruction.
+        DICT: Marker for dictionaries.
+        TUPLE: Marker for tuple values.
+        SET: Marker for set values.
+        ENUM: Marker for Enum members.
+        CLASS: Object class name.
+        MODULE: Module name defining the class.
+        PARAMS: Constructor parameters for get_params-based reconstruction.
+        STATE: State for __getstate__/__setstate__-based reconstruction.
     """
 
     DICT = "..dict.."
@@ -62,29 +59,19 @@ class _Markers:
 def _to_serializable_dict(x: Any, seen: set[int] | None = None) -> Any:
     """Convert a Python object into a JSON-serializable structure.
 
-    The transformation is recursive and supports primitives, lists, tuples,
-    sets, and dicts. Certain custom objects are supported either through
-    a get_params method or the pickle protocol __getstate__.
+    Recursively transforms objects into JSON-compatible types (dict, list, str,
+    number, bool, null), using markers for special types.
 
     Args:
         x: The object to convert.
-        seen:  A set of visited object ids for cycle detection.
+        seen: Visited object IDs for cycle detection.
 
     Returns:
-        A structure composed only of JSON-compatible types (dict, list, str,
-        int, float, bool, None), potentially enhanced with internal marker
-        keys to represent tuples, sets, and reconstructable objects.
+        A JSON-compatible structure with marker keys for non-native types.
 
     Raises:
-        TypeError: If x (or any nested value) contains an unsupported type.
-
-    Examples:
-        - Tuples and sets are encoded with markers:
-
-          >>> _to_serializable_dict((1, 2))
-          {'..tuple..': [1, 2]}
-          >>> _to_serializable_dict({1, 2})
-          {'..set..': [1, 2]}
+        TypeError: If x contains an unsupported type.
+        RecursionError: If a cyclic reference is detected.
     """
 
     if isinstance(x,(int, float, bool, str, type(None))):
@@ -150,14 +137,13 @@ def _process_state(state: Any, obj: Any, marker: str, seen: set[int]) -> dict:
     STATE). The state is recursively converted to JSON-serializable types.
 
     Args:
-        state: The object's state, e.g. from __getstate__.
-        obj: The object being serialized (used to extract class/module names).
-        marker: Which marker to use for the state payload.
-        seen: A set of visited object ids for cycle detection.
+        state: The object's state.
+        obj: The object being serialized.
+        marker: The marker key for the state.
+        seen: Visited object IDs.
 
     Returns:
-        A dictionary suitable for JSON encoding that can be used by
-        _recreate_object to rebuild the instance.
+        A dictionary for object reconstruction.
     """
 
     return {_Markers.CLASS: obj.__class__.__qualname__,
@@ -169,7 +155,7 @@ def _get_all_slots(cls: type) -> list[str]:
     """Collect all slot names from a class hierarchy, excluding special ones.
 
     Args:
-        cls: The class to inspect for __slots__.
+        cls: The class to inspect.
 
     Returns:
         List of slot names in MRO order, excluding __dict__ and __weakref__.
@@ -203,11 +189,8 @@ def _recreate_object(x: Mapping[str,Any]) -> Any:
         state, or Enum membership.
 
     Raises:
-        TypeError: If the mapping does not contain sufficient information to
-            reconstruct the object.
-        ImportError: If the target module cannot be imported. (Surfaced via the
-            underlying import mechanism.)
-        AttributeError: If the class does not exist in the target module.
+        TypeError: If metadata is invalid or missing markers.
+        ImportError: If the module or class cannot be found.
     """
     if not isinstance(x, Mapping):
         raise TypeError(f"Object metadata must be a mapping, "
@@ -344,7 +327,7 @@ def _from_serializable_dict(x: Any) -> Any:
 
 
 def dumpjs(obj: Any, **kwargs) -> JsonSerializedObject:
-    """Dump an object to a JSON string using the custom serialization rules.
+    """Dump an object to a JSON string using custom serialization.
 
     Args:
         obj: The object to serialize.
@@ -352,7 +335,7 @@ def dumpjs(obj: Any, **kwargs) -> JsonSerializedObject:
             json.dumps (e.g., indent=2, sort_keys=True).
 
     Returns:
-        The JSON string representing the object.
+        The JSON string.
     """
     return json.dumps(_to_serializable_dict(obj), **kwargs)
 
@@ -362,15 +345,14 @@ def loadjs(s: JsonSerializedObject, **kwargs) -> Any:
 
     Args:
         s: The JSON string to parse.
-        **kwargs: Additional keyword arguments forwarded to
-            json.loads (object_hook is not allowed here).
+        **kwargs: Arguments forwarded to json.loads (no object_hook).
 
     Returns:
-        The Python object reconstructed from the JSON string.
+        The reconstructed Python object.
 
     Raises:
         TypeError: If s is not a string.
-        ValueError: If object_hook is provided in kwargs.
+        ValueError: If object_hook is provided.
     """
     if not isinstance(s, str):
         raise TypeError(f"s must be a string, got {type(s).__name__}")
@@ -383,13 +365,13 @@ def _extract_params_dict(container: dict) -> dict:
     """Extract the parameter dictionary from a serialized container.
 
     Args:
-        container: A dictionary containing serialized parameters.
+        container: Serialized parameters container.
 
     Returns:
-        The parameter dictionary extracted from PARAMS->DICT or top-level DICT.
+        The extracted parameter dictionary.
 
     Raises:
-        KeyError: If the expected DICT structure is not found.
+        KeyError: If the expected structure is invalid.
     """
     def pick(block: Any) -> dict | None:
         if isinstance(block, dict):
@@ -419,18 +401,15 @@ def update_jsparams(jsparams: JsonSerializedObject, **kwargs) -> JsonSerializedO
     PARAMS -> DICT mapping.
 
     Args:
-        jsparams: The JSON string returned by dumpjs.
-        **kwargs: Key-value pairs to merge into the serialized parameters.
-            Existing keys are overwritten; new keys are added.
+        jsparams: The JSON string from dumpjs.
+        **kwargs: Parameters to update or add.
 
     Returns:
         A new JSON string with updated parameters.
 
     Raises:
         TypeError: If jsparams is not a string.
-        KeyError: If jsparams does not contain the expected
-            PARAMS -> DICT structure (i.e., the input is not a serialized
-            mixinforge object).
+        KeyError: If the structure is invalid.
     """
     if not isinstance(jsparams, str):
         raise TypeError(f"jsparams must be a string, got {type(jsparams).__name__}")
@@ -457,16 +436,13 @@ def access_jsparams(jsparams: JsonSerializedObject, *args: str) -> dict[str, Any
          *args: Parameter names to extract from the internal PARAMS -> DICT
              mapping.
 
-     Returns:
-         A mapping of requested parameter names to their deserialized
-         values. The values are reconstructed Python objects (e.g., tuples, sets,
-         dicts) rather than the raw internal JSON representation.
+    Returns:
+        A mapping of parameter names to their deserialized values.
 
-     Raises:
-         TypeError: If jsparams is not a string.
-         KeyError: If a requested key is not present, or if the JSON string does
-             not contain the expected PARAMS -> DICT structure.
-     """
+    Raises:
+        TypeError: If jsparams is not a string.
+        KeyError: If a key is missing or structure is invalid.
+    """
     if not isinstance(jsparams, str):
         raise TypeError(f"jsparams must be a string, got {type(jsparams).__name__}")
     params = json.loads(jsparams)
