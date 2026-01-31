@@ -1,130 +1,128 @@
-"""Tests for uninstall verification behavior using real package operations."""
+"""Tests for uninstall verification behavior using mocked package operations."""
 
 from __future__ import annotations
 
 import importlib.metadata as importlib_metadata
-import os
-from pathlib import Path
-import subprocess
-import sys
-import textwrap
+from unittest.mock import patch, MagicMock
 
 import pytest
 
 from mixinforge import uninstall_package
 
 
-def _pip_env() -> dict[str, str]:
-    env = os.environ.copy()
-    env["PIP_NO_INDEX"] = "1"
-    env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
-    env["PIP_CONFIG_FILE"] = os.devnull
-    return env
+def test_uninstall_verification_ignores_stdlib_import_name():
+    """Verify uninstall does not fail when import_name is a stdlib module.
 
-
-def _write_local_package(
-    package_dir: Path,
-    dist_name: str,
-    module_name: str | None = None,
-) -> None:
-    module_name = module_name or dist_name
-    package_dir.mkdir(parents=True, exist_ok=True)
-    (package_dir / f"{module_name}.py").write_text(
-        "VALUE = 1\n",
-        encoding="ascii",
-    )
-    setup_py = textwrap.dedent(
-        f"""
-        from setuptools import setup
-
-        setup(
-            name="{dist_name}",
-            version="0.0.0",
-            py_modules=["{module_name}"],
-        )
-        """
-    ).lstrip()
-    (package_dir / "setup.py").write_text(setup_py, encoding="ascii")
-
-
-def _pip_install_local(package_dir: Path) -> None:
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "--no-deps",
-            "--no-build-isolation",
-            str(package_dir),
-        ],
-        text=True,
-        capture_output=True,
-        env=_pip_env(),
-    )
-    assert result.returncode == 0, (
-        "pip install failed.\n"
-        f"stdout:\n{result.stdout}\n"
-        f"stderr:\n{result.stderr}"
-    )
-
-
-def _pip_uninstall(package_name: str) -> None:
-    subprocess.run(
-        [sys.executable, "-m", "pip", "uninstall", "-y", package_name],
-        check=False,
-        text=True,
-        capture_output=True,
-        env=_pip_env(),
-    )
-
-
-def test_uninstall_verification_ignores_stdlib_import_name(tmp_path):
-    """Verify uninstall does not fail when import_name is a stdlib module."""
-    pytest.importorskip("setuptools")
-    import json
-
-    assert json.loads('{"ok": true}') == {"ok": True}
+    When a package is uninstalled and verify_uninstall=True with an import_name
+    that happens to be a stdlib module (like 'json'), the verification should
+    pass because:
+    1. distribution(package_name) raises PackageNotFoundError (package gone)
+    2. packages_distributions().get(import_name) returns [] for stdlib modules
+    3. Since len([]) != 1, no RuntimeError is raised
+    """
     package_name = "mf_stdlib_shadow_pkg"
-    package_dir = tmp_path / package_name
-    _write_local_package(package_dir, package_name)
-    _pip_install_local(package_dir)
 
-    try:
-        assert importlib_metadata.distribution(package_name) is not None
+    with patch(
+        "mixinforge.utility_functions.package_manager._install_uv_and_pip"
+    ), patch(
+        "mixinforge.utility_functions.package_manager._run"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
+    ) as mock_distribution, patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.packages_distributions"
+    ) as mock_packages_distributions:
+        # Simulate package not found after uninstall
+        mock_distribution.side_effect = importlib_metadata.PackageNotFoundError(
+            package_name
+        )
+        # stdlib modules like 'json' are not in packages_distributions
+        mock_packages_distributions.return_value = {}
+
+        # Should not raise - stdlib import_name means no distribution found
         uninstall_package(
             package_name,
             import_name="json",
             verify_uninstall=True,
         )
-    finally:
-        _pip_uninstall(package_name)
-
-    with pytest.raises(importlib_metadata.PackageNotFoundError):
-        importlib_metadata.distribution(package_name)
-
-    assert json.dumps({"still": "there"}) == '{"still": "there"}'
 
 
-def test_uninstall_verification_falls_back_to_import_name(tmp_path):
-    """Verify uninstall fails when package_name is an alias for the import name."""
-    pytest.importorskip("setuptools")
+def test_uninstall_verification_falls_back_to_import_name():
+    """Verify uninstall fails when package_name is an alias for the import name.
+
+    When uninstalling with a package name that doesn't match the distribution
+    name but the import_name maps to exactly one distribution, it should raise
+    RuntimeError indicating the package is still installed under a different name.
+    """
     dist_name = "mf-alias-dist"
     module_name = "mf_alias_mod"
-    package_dir = tmp_path / dist_name
-    _write_local_package(package_dir, dist_name, module_name)
-    _pip_install_local(package_dir)
 
-    try:
-        assert importlib_metadata.distribution(dist_name) is not None
-        with pytest.raises(RuntimeError):
+    with patch(
+        "mixinforge.utility_functions.package_manager._install_uv_and_pip"
+    ), patch(
+        "mixinforge.utility_functions.package_manager._run"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
+    ) as mock_distribution, patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.packages_distributions"
+    ) as mock_packages_distributions:
+        # Simulate that the package_name (module_name) is not found as a distribution
+        mock_distribution.side_effect = importlib_metadata.PackageNotFoundError(
+            module_name
+        )
+        # But the import_name maps to exactly one distribution (the real dist_name)
+        mock_packages_distributions.return_value = {module_name: [dist_name]}
+
+        with pytest.raises(RuntimeError) as exc_info:
             uninstall_package(
                 module_name,
                 import_name=module_name,
                 verify_uninstall=True,
             )
-    finally:
-        _pip_uninstall(dist_name)
 
-    with pytest.raises(importlib_metadata.PackageNotFoundError):
-        importlib_metadata.distribution(dist_name)
+        assert dist_name in str(exc_info.value)
+        assert "still installed" in str(exc_info.value)
+
+
+def test_uninstall_verification_passes_when_distribution_not_found():
+    """Verify uninstall succeeds when distribution is completely removed."""
+    package_name = "some-package"
+
+    with patch(
+        "mixinforge.utility_functions.package_manager._install_uv_and_pip"
+    ), patch(
+        "mixinforge.utility_functions.package_manager._run"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
+    ) as mock_distribution:
+        mock_distribution.side_effect = importlib_metadata.PackageNotFoundError(
+            package_name
+        )
+
+        # Should not raise when no import_name provided and distribution not found
+        uninstall_package(
+            package_name,
+            verify_uninstall=True,
+        )
+
+
+def test_uninstall_verification_fails_when_distribution_still_exists():
+    """Verify uninstall fails when distribution is still found after uninstall."""
+    package_name = "stubborn-package"
+
+    with patch(
+        "mixinforge.utility_functions.package_manager._install_uv_and_pip"
+    ), patch(
+        "mixinforge.utility_functions.package_manager._run"
+    ), patch(
+        "mixinforge.utility_functions.package_manager.importlib_metadata.distribution"
+    ) as mock_distribution:
+        # Distribution still exists after uninstall attempt
+        mock_distribution.return_value = MagicMock()
+
+        with pytest.raises(RuntimeError) as exc_info:
+            uninstall_package(
+                package_name,
+                verify_uninstall=True,
+            )
+
+        assert "still installed after uninstallation" in str(exc_info.value)
