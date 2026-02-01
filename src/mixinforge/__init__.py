@@ -29,6 +29,7 @@ Public API:
 - is_executed_in_notebook: Detect if running in Jupyter/IPython notebook.
 - reset_notebook_detection: Clear cached notebook detection result.
 - install_package: Install a Python package from PyPI into the current environment.
+- is_package_installed: Check if a Python package is currently installed.
 - uninstall_package: Remove a Python package from the current environment.
 """
 
@@ -51,6 +52,7 @@ from .utility_functions import (
     flatten_nested_collection,
     find_instances_inside_composite_object,
     install_package,
+    is_package_installed,
     transform_instances_inside_composite_object,
     is_executed_in_notebook,
     loadjs,
@@ -78,6 +80,7 @@ __all__ = [
     'flatten_nested_collection',
     'find_instances_inside_composite_object',
     'install_package',
+    'is_package_installed',
     'transform_instances_inside_composite_object',
     'is_executed_in_notebook',
     'loadjs',

@@ -172,6 +172,12 @@ Utility Functions
      - Transform instances of type(s) in composite
    * - ``is_executed_in_notebook()``
      - Detect if running in Jupyter/IPython notebook
+   * - ``install_package(name, ...)``
+     - Install a Python package from PyPI at runtime
+   * - ``is_package_installed(name)``
+     - Check if a Python package is currently installed
+   * - ``uninstall_package(name, ...)``
+     - Remove a Python package from the environment
 
 Context Managers
 ~~~~~~~~~~~~~~~~
@@ -405,6 +411,28 @@ Dictionary Utilities
 * **sort_dict_by_keys(d)** — Returns a new dictionary with keys
   sorted alphabetically, useful for consistent serialization and
   comparison
+
+Package Management
+~~~~~~~~~~~~~~~~~~
+
+Tools for runtime package installation, checking, and removal:
+
+* **install_package(package_name, upgrade=False, version=None, use_uv=True, import_name=None, verify_import=True)** —
+  Install a Python package from PyPI into the current environment. Supports version pinning,
+  upgrade mode, and handles packages where PyPI name differs from import name (e.g., "Pillow" vs "PIL").
+  Uses ``uv`` by default for speed, falling back to ``pip`` when needed.
+
+* **is_package_installed(package_name)** —
+  Check if a Python package is currently installed in the environment. Returns ``True`` if installed,
+  ``False`` otherwise. Handles package name variations (hyphens, underscores, capitalization) through
+  canonicalization for reliable detection.
+
+* **uninstall_package(package_name, use_uv=True, import_name=None, verify_uninstall=True)** —
+  Remove a Python package from the current environment. Protects critical package managers
+  (pip, uv) from accidental removal. Verifies complete removal by default.
+
+These functions automatically bootstrap missing package managers and invalidate Python's
+import caches after operations to ensure the import system reflects filesystem changes.
 
 Context Managers
 ----------------

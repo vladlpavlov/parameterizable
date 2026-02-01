@@ -16,7 +16,10 @@ from mixinforge import (
     install_package,
     uninstall_package,
 )
-from mixinforge.utility_functions.package_manager import _validate_package_args
+from mixinforge.utility_functions.package_manager import (
+    _validate_package_args,
+    is_package_installed,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -475,3 +478,73 @@ def test_install_accepts_package_with_hyphens_underscores():
 
     with pytest.raises(RuntimeError):  # Nonexistent, but validation passes
         install_package("test_package_name", verify_import=False)
+
+
+# is_package_installed Tests
+
+def test_is_package_installed_returns_true_for_installed_package():
+    """Verify is_package_installed returns True for installed packages."""
+    # pytest is always available in test environment
+    assert is_package_installed("pytest") is True
+
+
+def test_is_package_installed_returns_false_for_nonexistent_package():
+    """Verify is_package_installed returns False for packages not installed."""
+    fake_package = "xyzabc123nonexistent9999"
+    assert is_package_installed(fake_package) is False
+
+
+def test_is_package_installed_handles_name_canonicalization():
+    """Verify is_package_installed handles package name variations."""
+    # pytest can be referenced with different capitalizations
+    assert is_package_installed("pytest") is True
+    assert is_package_installed("PyTest") is True
+    assert is_package_installed("PYTEST") is True
+
+
+@pytest.mark.parametrize("use_uv", [True, False])
+def test_is_package_installed_integration_with_install_uninstall(use_uv):
+    """Verify is_package_installed tracks installation state correctly."""
+    package = "nothing"
+
+    # Ensure clean state
+    try:
+        uninstall_package(package, use_uv=use_uv, verify_uninstall=False)
+    except RuntimeError:
+        pass
+
+    try:
+        # Initially not installed
+        assert is_package_installed(package) is False
+
+        # Install package
+        install_package(package, use_uv=use_uv, verify_import=True)
+        assert is_package_installed(package) is True
+
+        # Uninstall package
+        uninstall_package(package, use_uv=use_uv, verify_uninstall=True)
+        assert is_package_installed(package) is False
+    finally:
+        # Ensure cleanup
+        try:
+            uninstall_package(package, use_uv=use_uv, verify_uninstall=False)
+        except Exception:
+            pass
+
+
+def test_is_package_installed_rejects_invalid_package_name():
+    """Verify is_package_installed validates package name format."""
+    with pytest.raises(ValueError):
+        is_package_installed("")
+
+    with pytest.raises(ValueError):
+        is_package_installed("package@name")
+
+
+def test_is_package_installed_rejects_non_string():
+    """Verify is_package_installed rejects non-string arguments."""
+    with pytest.raises(ValueError, match="package_name must be"):
+        is_package_installed(None)
+
+    with pytest.raises(ValueError, match="package_name must be"):
+        is_package_installed(123)

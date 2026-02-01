@@ -4,6 +4,8 @@ Provides safe, synchronous installation and uninstallation of Python packages
 within a running interpreter. Prefers uv, falls back to pip.
 """
 
+__all__ = ["install_package", "is_package_installed", "uninstall_package"]
+
 import subprocess
 import importlib
 import importlib.metadata as importlib_metadata
@@ -290,6 +292,39 @@ def _install_uv_and_pip() -> None:
     """
     _ensure_pip_available()
     _ensure_uv_available()
+
+
+def is_package_installed(package_name: str) -> bool:
+    """Check if a Python package is currently installed in the environment.
+
+    Uses importlib.metadata to check for the package distribution. Package
+    names are canonicalized before checking to handle variations in naming
+    (hyphens vs underscores, capitalization).
+
+    Args:
+        package_name: PyPI package name to check (e.g., "requests", "Pillow").
+
+    Returns:
+        True if the package is installed, False otherwise.
+
+    Raises:
+        ValueError: If package_name is invalid.
+
+    Example:
+        >>> is_package_installed("requests")
+        True
+        >>> is_package_installed("nonexistent-package")
+        False
+    """
+    _validate_package_args(package_name=package_name)
+
+    canonical_name = _canonicalize_distribution_name(package_name)
+
+    try:
+        importlib_metadata.distribution(canonical_name)
+        return True
+    except importlib_metadata.PackageNotFoundError:
+        return False
 
 
 def install_package(package_name: str,
