@@ -57,6 +57,7 @@ def _run(command: list[str], timeout: int = 300) -> None:
 
 def _is_module_available(module_name: str) -> bool:
     """Check if a module is available (avoids importing it)."""
+    importlib.invalidate_caches()
     return importlib.util.find_spec(module_name) is not None
 
 
@@ -317,14 +318,8 @@ def is_package_installed(package_name: str) -> bool:
         False
     """
     _validate_package_args(package_name=package_name)
-
     canonical_name = _canonicalize_distribution_name(package_name)
-
-    try:
-        importlib_metadata.distribution(canonical_name)
-        return True
-    except importlib_metadata.PackageNotFoundError:
-        return False
+    return _is_module_available(canonical_name)
 
 
 def install_package(package_name: str,
