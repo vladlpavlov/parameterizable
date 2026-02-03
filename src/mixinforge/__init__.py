@@ -28,6 +28,7 @@ Public API:
 - transform_instances_inside_composite_object: Transform instances of type(s) in composite structures. Supports deep (handles cycles) or shallow search.
 - is_executed_in_notebook: Detect if running in Jupyter/IPython notebook.
 - reset_notebook_detection: Clear cached notebook detection result.
+- is_valid_env_name: Validate environment variable names using a strict, portable rule.
 - install_package: Install a Python package from PyPI into the current environment.
 - is_package_installed: Check if a Python package is currently installed.
 - uninstall_package: Remove a Python package from the current environment.
@@ -53,6 +54,7 @@ from .utility_functions import (
     find_instances_inside_composite_object,
     install_package,
     is_package_installed,
+    is_valid_env_name,
     transform_instances_inside_composite_object,
     is_executed_in_notebook,
     loadjs,
@@ -81,6 +83,7 @@ __all__ = [
     'find_instances_inside_composite_object',
     'install_package',
     'is_package_installed',
+    'is_valid_env_name',
     'transform_instances_inside_composite_object',
     'is_executed_in_notebook',
     'loadjs',

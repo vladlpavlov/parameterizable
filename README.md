@@ -112,9 +112,11 @@ For development:
 | `find_instances_inside_composite_object(obj, classinfo, deep_search=True)` | Find instances of type(s) in composite |
 | `transform_instances_inside_composite_object(obj, classinfo, fn)` | Transform instances of type(s) in composite |
 | `is_executed_in_notebook()` | Detect if running in Jupyter/IPython notebook |
+| `is_valid_env_name(name)` | Validate environment variable names |
 | `install_package(name, ...)` | Install a Python package from PyPI at runtime |
 | `is_package_installed(name)` | Check if a Python package is currently installed |
 | `uninstall_package(name, ...)` | Remove a Python package from the environment |
+
 
 ### Context Managers
 
@@ -308,6 +310,12 @@ graphs including cyclic references. Each object is visited only once
 (deduplication by identity), making them safe for graphs with cycles
 or shared references. Useful for introspection, validation, and
 structural transformations.
+
+### Environment Variable Name Validation
+
+- **`is_valid_env_name(name)`** - Enforces a portable, shell-safe subset of 
+environment variable names (POSIX identifiers).
+
 
 ### Dictionary Utilities
 
