@@ -295,31 +295,43 @@ def _install_uv_and_pip() -> None:
     _ensure_uv_available()
 
 
+# def is_package_installed(package_name: str) -> bool:
+#     """Check if a Python package is currently installed in the environment.
+#
+#     Uses importlib.metadata to check for the package distribution. Package
+#     names are canonicalized before checking to handle variations in naming
+#     (hyphens vs underscores, capitalization).
+#
+#     Args:
+#         package_name: PyPI package name to check (e.g., "requests", "Pillow").
+#
+#     Returns:
+#         True if the package is installed, False otherwise.
+#
+#     Raises:
+#         ValueError: If package_name is invalid.
+#
+#     Example:
+#         >>> is_package_installed("requests")
+#         True
+#         >>> is_package_installed("nonexistent-package")
+#         False
+#     """
+#     _validate_package_args(package_name=package_name)
+#     canonical_name = _canonicalize_distribution_name(package_name)
+#     return _is_module_available(canonical_name)
+
+
 def is_package_installed(package_name: str) -> bool:
-    """Check if a Python package is currently installed in the environment.
-
-    Uses importlib.metadata to check for the package distribution. Package
-    names are canonicalized before checking to handle variations in naming
-    (hyphens vs underscores, capitalization).
-
-    Args:
-        package_name: PyPI package name to check (e.g., "requests", "Pillow").
-
-    Returns:
-        True if the package is installed, False otherwise.
-
-    Raises:
-        ValueError: If package_name is invalid.
-
-    Example:
-        >>> is_package_installed("requests")
-        True
-        >>> is_package_installed("nonexistent-package")
-        False
-    """
+    """Check if a Python package is installed and importable."""
     _validate_package_args(package_name=package_name)
     canonical_name = _canonicalize_distribution_name(package_name)
-    return _is_module_available(canonical_name)
+    try:
+        importlib.invalidate_caches()
+        importlib.import_module(canonical_name)
+        return True
+    except Exception:
+        return False
 
 
 def install_package(package_name: str,
