@@ -76,7 +76,7 @@ def _create_dict_subclass_copy(original: dict) -> dict:
 class _ObjectReconstructor:
     """Recursive object reconstruction with cycle handling."""
 
-    def __init__(self, classinfo: ClassInfo, transform_fn: Callable[[Any], Any], deep_transformation: bool = True):
+    def __init__(self, classinfo: ClassInfo, transform_fn: Callable[[Any], Any], *, deep_transformation: bool = True):
         self.classinfo = classinfo
         self.transform_fn = transform_fn
         self.deep_transformation = deep_transformation
@@ -313,7 +313,8 @@ def transform_instances_inside_composite_object(
     obj: Any,
     classinfo: ClassInfo,
     transform_fn: Callable[[Any], Any],
-    deep_transformation: bool = True
+    *,
+    deep_transformation: bool = True,
 ) -> Any:
     """Transform all instances of a target type within any object.
 
@@ -347,6 +348,6 @@ def transform_instances_inside_composite_object(
     if isinstance(obj, Iterator):
         obj = list(obj)
 
-    reconstructor = _ObjectReconstructor(classinfo, transform_fn, deep_transformation)
+    reconstructor = _ObjectReconstructor(classinfo, transform_fn, deep_transformation=deep_transformation)
     result = reconstructor.reconstruct(obj)
     return result if reconstructor.any_replacements else obj

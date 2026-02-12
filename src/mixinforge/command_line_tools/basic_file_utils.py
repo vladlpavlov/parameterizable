@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 
 
-def sanitize_and_validate_path(path: Path | str, must_exist: bool = True, must_be_dir: bool = False) -> Path:
+def sanitize_and_validate_path(path: Path | str, *, must_exist: bool = True, must_be_dir: bool = False) -> Path:
     """Validate and sanitize a file path for secure access.
 
     Ensures the path is valid, resolves it to an absolute normalized form,

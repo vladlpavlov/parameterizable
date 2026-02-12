@@ -56,7 +56,7 @@ class _Markers:
     ENUM = "..enum.."
 
 
-def _to_serializable_dict(x: Any, seen: set[int] | None = None) -> Any:
+def _to_serializable_dict(x: Any, *, seen: set[int] | None = None) -> Any:
     """Convert a Python object into a JSON-serializable structure.
 
     Recursively transforms objects into JSON-compatible types (dict, list, str,
@@ -90,22 +90,22 @@ def _to_serializable_dict(x: Any, seen: set[int] | None = None) -> Any:
 
     try:
         if hasattr(x, "get_params"):
-            result = _process_state(x.get_params(), x, _Markers.PARAMS, seen)
+            result = _process_state(x.get_params(), obj=x, marker=_Markers.PARAMS, seen=seen)
         elif isinstance(x, list):
-            result = [_to_serializable_dict(i, seen) for i in x]
+            result = [_to_serializable_dict(i, seen=seen) for i in x]
         elif isinstance(x, tuple):
-            result = {_Markers.TUPLE: [_to_serializable_dict(i, seen) for i in x]}
+            result = {_Markers.TUPLE: [_to_serializable_dict(i, seen=seen) for i in x]}
         elif isinstance(x, set):
-            result = {_Markers.SET: [_to_serializable_dict(i, seen) for i in x]}
+            result = {_Markers.SET: [_to_serializable_dict(i, seen=seen) for i in x]}
         elif isinstance(x, dict):
-            result = {_Markers.DICT: { k: _to_serializable_dict(v, seen)
+            result = {_Markers.DICT: { k: _to_serializable_dict(v, seen=seen)
                 for k, v in x.items()}}
         elif isinstance(x, Enum):
             result = {_Markers.ENUM: x.name,
                 _Markers.CLASS: x.__class__.__qualname__,
                 _Markers.MODULE: x.__class__.__module__,}
         elif hasattr(x, "__getstate__"):
-            result = _process_state(x.__getstate__(), x, _Markers.STATE, seen)
+            result = _process_state(x.__getstate__(), obj=x, marker=_Markers.STATE, seen=seen)
         elif hasattr(x.__class__, "__slots__"):
             # For slotted objects, create a pickle-style state tuple
             slots = _get_all_slots(type(x))
@@ -119,9 +119,9 @@ def _to_serializable_dict(x: Any, seen: set[int] | None = None) -> Any:
                 # Slots-only object: use a (slots, None) tuple for consistency
                 # in the reconstruction logic.
                 final_state = (slot_state, None)
-            result = _process_state(final_state, x, _Markers.STATE, seen)
+            result = _process_state(final_state, obj=x, marker=_Markers.STATE, seen=seen)
         elif hasattr(x, "__dict__"):
-            result = _process_state(x.__dict__, x, _Markers.STATE, seen)
+            result = _process_state(x.__dict__, obj=x, marker=_Markers.STATE, seen=seen)
         else:
             raise TypeError(f"Unsupported type: {type(x).__name__}")
     finally:
@@ -129,7 +129,7 @@ def _to_serializable_dict(x: Any, seen: set[int] | None = None) -> Any:
     return result
 
 
-def _process_state(state: Any, obj: Any, marker: str, seen: set[int]) -> dict:
+def _process_state(state: Any, *, obj: Any, marker: str, seen: set[int]) -> dict:
     """Wrap object identity and state into a marker-bearing mapping.
 
     Produces a dictionary containing the object's class and module names along
@@ -148,7 +148,7 @@ def _process_state(state: Any, obj: Any, marker: str, seen: set[int]) -> dict:
 
     return {_Markers.CLASS: obj.__class__.__qualname__,
         _Markers.MODULE: obj.__class__.__module__,
-        marker: _to_serializable_dict(state, seen)}
+        marker: _to_serializable_dict(state, seen=seen)}
 
 
 def _get_all_slots(cls: type) -> list[str]:

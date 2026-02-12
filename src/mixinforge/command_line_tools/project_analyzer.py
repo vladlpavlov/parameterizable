@@ -194,7 +194,7 @@ class ProjectAnalysis:
         )
 
 
-def count_sloc(tree: ast.AST, content: str) -> int:
+def count_sloc(tree: ast.AST, *, content: str) -> int:
     """Count source lines of code, excluding blank lines, comments, and docstrings.
 
     Args:
@@ -238,7 +238,7 @@ def count_sloc(tree: ast.AST, content: str) -> int:
     return sloc
 
 
-def analyze_file(file_path: Path | str, root_path: Path | str | None = None) -> CodeStats:
+def analyze_file(file_path: Path | str, *, root_path: Path | str | None = None) -> CodeStats:
     """Analyze a single Python file and extract code statistics.
 
     Parses the file's AST to count classes, functions, and lines. Validates
@@ -297,7 +297,7 @@ def analyze_file(file_path: Path | str, root_path: Path | str | None = None) -> 
         functions = sum(1 for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)))
         classes = sum(1 for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
         lines = len(content.splitlines())
-        sloc = count_sloc(tree, content)
+        sloc = count_sloc(tree, content=content)
 
         return CodeStats(lines=lines, sloc=sloc, classes=classes, functions=functions, files=1)
     except Exception as e:
@@ -305,7 +305,7 @@ def analyze_file(file_path: Path | str, root_path: Path | str | None = None) -> 
         return CodeStats()
 
 
-def is_test_file(file_path: Path, root: Path) -> bool:
+def is_test_file(file_path: Path, *, root: Path) -> bool:
     """Determine if a file is a test file based on conventions.
 
     Identifies test files using common Python testing conventions:
@@ -336,7 +336,7 @@ def is_test_file(file_path: Path, root: Path) -> bool:
     return is_test
 
 
-def should_analyze_file(file_path: Path, root: Path) -> bool:
+def should_analyze_file(file_path: Path, *, root: Path) -> bool:
     """Determine if a file should be analyzed based on exclusion patterns.
 
     Excludes common directories like virtual environments, build artifacts,
@@ -376,7 +376,7 @@ def empty_analysis() -> ProjectAnalysis:
     )
 
 
-def analyze_project(path_to_root: Path | str, verbose: bool = False) -> ProjectAnalysis:
+def analyze_project(path_to_root: Path | str, *, verbose: bool = False) -> ProjectAnalysis:
     """Analyze a Python project directory and return comprehensive metrics.
 
     Recursively scans the project directory for Python files, analyzes each
@@ -447,7 +447,7 @@ def analyze_project(path_to_root: Path | str, verbose: bool = False) -> ProjectA
                 if skip_file:
                     continue
 
-                if not should_analyze_file(file_path, validated_root):
+                if not should_analyze_file(file_path, root=validated_root):
                     if verbose:
                         print(f"Skipping excluded file: {file_path}")
                     continue
@@ -457,7 +457,7 @@ def analyze_project(path_to_root: Path | str, verbose: bool = False) -> ProjectA
 
                 stats = analyze_file(file_path, root_path=validated_root)
 
-                if is_test_file(file_path, validated_root):
+                if is_test_file(file_path, root=validated_root):
                     unit_tests += stats
                 else:
                     main_code += stats

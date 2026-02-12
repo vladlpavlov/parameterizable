@@ -24,19 +24,19 @@ def test_get_cached_property_basic():
     _ = a.x
     _ = a.y
 
-    assert a._get_cached_property("x") == 1
-    assert a._get_cached_property("y") == 2
+    assert a._get_cached_property(name="x") == 1
+    assert a._get_cached_property(name="y") == 2
 
 def test_get_cached_property_not_cached_yet():
     """Test that _get_cached_property() raises KeyError for uncached properties."""
     a = A()
     # x exists as a cached_property but hasn't been accessed yet
     with pytest.raises(KeyError):
-        a._get_cached_property("x")
+        a._get_cached_property(name="x")
 
     # After caching, it should work
     _ = a.x
-    assert a._get_cached_property("x") == 1
+    assert a._get_cached_property(name="x") == 1
 
 def test_get_cached_property_invalid_name():
     """Test that _get_cached_property() raises ValueError for invalid names."""
@@ -44,11 +44,11 @@ def test_get_cached_property_invalid_name():
 
     # Non-existent property
     with pytest.raises(ValueError):
-        a._get_cached_property("invalid_name")
+        a._get_cached_property(name="invalid_name")
 
     # Regular @property (not cached_property)
     with pytest.raises(ValueError):
-        a._get_cached_property("z")
+        a._get_cached_property(name="z")
 
 def test_get_cached_property_inheritance():
     """Test that _get_cached_property() works with inherited properties."""
@@ -66,13 +66,13 @@ def test_get_cached_property_inheritance():
     _ = c.base_prop
     _ = c.child_prop
 
-    assert c._get_cached_property("base_prop") == "base"
-    assert c._get_cached_property("child_prop") == "child"
+    assert c._get_cached_property(name="base_prop") == "base"
+    assert c._get_cached_property(name="child_prop") == "child"
 
 def test_get_cached_property_after_set():
     """Test that _get_cached_property() retrieves values set via _set_cached_properties()."""
     a = A()
     a._set_cached_properties(x=100, y=200)
 
-    assert a._get_cached_property("x") == 100
-    assert a._get_cached_property("y") == 200
+    assert a._get_cached_property(name="x") == 100
+    assert a._get_cached_property(name="y") == 200

@@ -137,7 +137,7 @@ class CacheablePropertiesMixin:
                 if name in vars_dict}
 
 
-    def _get_cached_property(self, name: str) -> Any:
+    def _get_cached_property(self, *, name: str) -> Any:
         """Retrieve the cached value for a single cached property.
 
         Args:
@@ -163,7 +163,7 @@ class CacheablePropertiesMixin:
         return self.__dict__[name]
 
 
-    def _get_cached_property_status(self, name: str) -> bool:
+    def _get_cached_property_status(self, *, name: str) -> bool:
         """Check if a cached property has a cached value.
 
         Args:

@@ -13,47 +13,47 @@ from mixinforge.mixins_and_metaclasses.guarded_init_metaclass import (
 def test_validate_pickle_state_integrity():
     """Test validation of pickle state for forbidden _init_finished=True."""
     # Test valid state (dict)
-    _validate_pickle_state_integrity({}, "TestClass")
-    _validate_pickle_state_integrity({"_init_finished": False}, "TestClass")
-    _validate_pickle_state_integrity(None, "TestClass")
+    _validate_pickle_state_integrity({}, cls_name="TestClass")
+    _validate_pickle_state_integrity({"_init_finished": False}, cls_name="TestClass")
+    _validate_pickle_state_integrity(None, cls_name="TestClass")
 
     # Test valid state (tuple)
-    _validate_pickle_state_integrity(({}, {}), "TestClass")
+    _validate_pickle_state_integrity(({}, {}), cls_name="TestClass")
 
     # Test invalid state (dict)
     with pytest.raises(RuntimeError):
-        _validate_pickle_state_integrity({"_init_finished": True}, "TestClass")
+        _validate_pickle_state_integrity({"_init_finished": True}, cls_name="TestClass")
 
     # Test invalid state (tuple)
     with pytest.raises(RuntimeError):
-         _validate_pickle_state_integrity(({"_init_finished": True}, None), "TestClass")
+         _validate_pickle_state_integrity(({"_init_finished": True}, None), cls_name="TestClass")
 
 def test_parse_pickle_state():
     """Test parsing of various pickle state formats."""
     # None
-    assert _parse_pickle_state(None, "C") == (None, None)
-    
+    assert _parse_pickle_state(None, cls_name="C") == (None, None)
+
     # Dict
-    assert _parse_pickle_state({"a": 1}, "C") == ({"a": 1}, None)
-    
+    assert _parse_pickle_state({"a": 1}, cls_name="C") == ({"a": 1}, None)
+
     # Tuple (dict, dict)
-    assert _parse_pickle_state(({"a": 1}, {"b": 2}), "C") == ({"a": 1}, {"b": 2})
-    
+    assert _parse_pickle_state(({"a": 1}, {"b": 2}), cls_name="C") == ({"a": 1}, {"b": 2})
+
     # Tuple (dict, None)
-    assert _parse_pickle_state(({"a": 1}, None), "C") == ({"a": 1}, None)
-    
+    assert _parse_pickle_state(({"a": 1}, None), cls_name="C") == ({"a": 1}, None)
+
     # Tuple (None, dict)
-    assert _parse_pickle_state((None, {"b": 2}), "C") == (None, {"b": 2})
-    
+    assert _parse_pickle_state((None, {"b": 2}), cls_name="C") == (None, {"b": 2})
+
     # Invalid states
     with pytest.raises(RuntimeError):
-        _parse_pickle_state("invalid", "C")
+        _parse_pickle_state("invalid", cls_name="C")
 
     with pytest.raises(RuntimeError):
-        _parse_pickle_state((1, 2), "C")
+        _parse_pickle_state((1, 2), cls_name="C")
 
     with pytest.raises(RuntimeError):
-        _parse_pickle_state((1, 2, 3), "C")
+        _parse_pickle_state((1, 2, 3), cls_name="C")
 
 def test_restore_dict_state():
     """Test restoring state into __dict__."""
@@ -62,17 +62,17 @@ def test_restore_dict_state():
     
     obj = Obj()
     # By default Obj has __dict__
-    _restore_dict_state(obj, {"x": 10}, "Obj")
+    _restore_dict_state(obj, state_dict={"x": 10}, cls_name="Obj")
     assert obj.x == 10
-    
+
     class SlotsObj:
         __slots__ = ["x"]
         def __init__(self):
             self.x = 0
-    
+
     slots_obj = SlotsObj()
     with pytest.raises(RuntimeError):
-        _restore_dict_state(slots_obj, {"x": 10}, "SlotsObj")
+        _restore_dict_state(slots_obj, state_dict={"x": 10}, cls_name="SlotsObj")
 
 def test_restore_slots_state():
     """Test restoring state into slots."""
@@ -83,13 +83,13 @@ def test_restore_slots_state():
             self.y = 0
         
     obj = SlotsObj()
-    _restore_slots_state(obj, {"x": 1, "y": 2})
+    _restore_slots_state(obj, state_slots={"x": 1, "y": 2})
     assert obj.x == 1
     assert obj.y == 2
-    
+
     # It assumes attributes are valid, if not setattr raises AttributeError usually.
     with pytest.raises(AttributeError):
-        _restore_slots_state(obj, {"z": 3})
+        _restore_slots_state(obj, state_slots={"z": 3})
 
 def test_invoke_post_setstate_hook():
     """Test invocation of __post_setstate__ hook."""
@@ -125,19 +125,19 @@ def test_re_raise_with_context():
     """Test exception wrapping logic."""
     # Exception with standard init
     try:
-        _re_raise_with_context("MyHook", ValueError("bad value"))
+        _re_raise_with_context("MyHook", exc=ValueError("bad value"))
     except ValueError as e:
         assert "Error in MyHook: bad value" in str(e)
         assert isinstance(e, ValueError)
         assert e.__cause__ is not None
-        
+
     # Exception with custom init that might fail with single string
     class CustomError(Exception):
         def __init__(self, arg1, arg2):
             super().__init__(arg1, arg2)
-            
+
     try:
-        _re_raise_with_context("MyHook", CustomError("a", "b"))
+        _re_raise_with_context("MyHook", exc=CustomError("a", "b"))
     except RuntimeError as e:
         assert "Error in MyHook" in str(e)
         assert "CustomError" in str(e)

@@ -27,7 +27,7 @@ def test_count_sloc_simple_code():
 y = 2
 z = x + y"""
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 3
 
 
@@ -37,7 +37,7 @@ def test_count_sloc_excludes_blank_lines():
 
 y = 2"""
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 2
 
 
@@ -48,7 +48,7 @@ x = 1
 # Another comment
 y = 2"""
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 2
 
 
@@ -59,7 +59,7 @@ spanning multiple
 lines."""
 x = 1'''
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 1
 
 
@@ -69,7 +69,7 @@ def test_count_sloc_excludes_function_docstring():
     """Function docstring."""
     return 42'''
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 2  # def line and return line
 
 
@@ -80,7 +80,7 @@ def test_count_sloc_excludes_class_docstring():
     def __init__(self):
         pass'''
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 3  # class line, def line, pass line
 
 
@@ -93,7 +93,7 @@ def test_count_sloc_multiline_docstring():
     x = 1
     return x'''
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 3  # def, x = 1, return x
 
 
@@ -102,7 +102,7 @@ def test_count_sloc_inline_comment_counted():
     code = """x = 1  # inline comment
 y = 2"""
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 2
 
 
@@ -112,7 +112,7 @@ def test_count_sloc_with_async_function_docstring():
     """Async function docstring."""
     return await something()'''
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 2  # async def line and return line
 
 
@@ -124,7 +124,7 @@ if x:
 else:
     y = 3'''
     tree = ast.parse(code)
-    sloc = count_sloc(tree, code)
+    sloc = count_sloc(tree, content=code)
     assert sloc == 5
 
 
@@ -304,7 +304,7 @@ def test_is_test_file_in_tests_directory(tmp_path):
     test_file.parent.mkdir()
     test_file.write_text("# test")
 
-    assert is_test_file(test_file, tmp_path) is True
+    assert is_test_file(test_file, root=tmp_path) is True
 
 
 def test_is_test_file_in_test_directory(tmp_path):
@@ -313,7 +313,7 @@ def test_is_test_file_in_test_directory(tmp_path):
     test_file.parent.mkdir()
     test_file.write_text("# test")
 
-    assert is_test_file(test_file, tmp_path) is True
+    assert is_test_file(test_file, root=tmp_path) is True
 
 
 def test_is_test_file_with_test_prefix(tmp_path):
@@ -321,7 +321,7 @@ def test_is_test_file_with_test_prefix(tmp_path):
     test_file = tmp_path / "test_foo.py"
     test_file.write_text("# test")
 
-    assert is_test_file(test_file, tmp_path) is True
+    assert is_test_file(test_file, root=tmp_path) is True
 
 
 def test_is_test_file_with_test_suffix(tmp_path):
@@ -329,7 +329,7 @@ def test_is_test_file_with_test_suffix(tmp_path):
     test_file = tmp_path / "foo_test.py"
     test_file.write_text("# test")
 
-    assert is_test_file(test_file, tmp_path) is True
+    assert is_test_file(test_file, root=tmp_path) is True
 
 
 def test_is_test_file_regular_file_is_false(tmp_path):
@@ -337,7 +337,7 @@ def test_is_test_file_regular_file_is_false(tmp_path):
     regular_file = tmp_path / "foo.py"
     regular_file.write_text("# regular")
 
-    assert is_test_file(regular_file, tmp_path) is False
+    assert is_test_file(regular_file, root=tmp_path) is False
 
 
 def test_is_test_file_nested_tests_directory(tmp_path):
@@ -346,7 +346,7 @@ def test_is_test_file_nested_tests_directory(tmp_path):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# test")
 
-    assert is_test_file(test_file, tmp_path) is True
+    assert is_test_file(test_file, root=tmp_path) is True
 
 
 def test_is_test_file_outside_root_returns_false(tmp_path):
@@ -355,13 +355,13 @@ def test_is_test_file_outside_root_returns_false(tmp_path):
     outside.parent.mkdir(exist_ok=True)
     outside.write_text("# test")
 
-    assert is_test_file(outside, tmp_path) is False
+    assert is_test_file(outside, root=tmp_path) is False
 
 
 def test_is_test_file_invalid_path_type_returns_false():
     """Verify is_test_file returns False for invalid path types."""
-    assert is_test_file("string_path", Path("/root")) is False
-    assert is_test_file(Path("/test.py"), "string_root") is False
+    assert is_test_file("string_path", root=Path("/root")) is False
+    assert is_test_file(Path("/test.py"), root="string_root") is False
 
 
 def test_is_test_file_with_nested_subdirectories(tmp_path):
@@ -371,7 +371,7 @@ def test_is_test_file_with_nested_subdirectories(tmp_path):
     test_file = deeply_nested / "test_deep.py"
     test_file.write_text("# test")
 
-    assert is_test_file(test_file, tmp_path) is True
+    assert is_test_file(test_file, root=tmp_path) is True
 
 
 # ============================================================================
@@ -383,7 +383,7 @@ def test_should_analyze_file_regular_python_file(tmp_path):
     test_file = tmp_path / "foo.py"
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is True
+    assert should_analyze_file(test_file, root=tmp_path) is True
 
 
 def test_should_analyze_file_excludes_venv(tmp_path):
@@ -392,7 +392,7 @@ def test_should_analyze_file_excludes_venv(tmp_path):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 def test_should_analyze_file_excludes_pycache(tmp_path):
@@ -401,7 +401,7 @@ def test_should_analyze_file_excludes_pycache(tmp_path):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 def test_should_analyze_file_excludes_dotfiles_directories(tmp_path):
@@ -410,7 +410,7 @@ def test_should_analyze_file_excludes_dotfiles_directories(tmp_path):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 def test_should_analyze_file_excludes_egg_info(tmp_path):
@@ -419,7 +419,7 @@ def test_should_analyze_file_excludes_egg_info(tmp_path):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 def test_should_analyze_file_excludes_docs(tmp_path):
@@ -428,7 +428,7 @@ def test_should_analyze_file_excludes_docs(tmp_path):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 def test_should_analyze_file_excludes_build(tmp_path):
@@ -437,7 +437,7 @@ def test_should_analyze_file_excludes_build(tmp_path):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 def test_should_analyze_file_excludes_dist(tmp_path):
@@ -446,7 +446,7 @@ def test_should_analyze_file_excludes_dist(tmp_path):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 def test_should_analyze_file_outside_root_returns_false(tmp_path):
@@ -455,13 +455,13 @@ def test_should_analyze_file_outside_root_returns_false(tmp_path):
     outside.parent.mkdir(exist_ok=True)
     outside.write_text("# code")
 
-    assert should_analyze_file(outside, tmp_path) is False
+    assert should_analyze_file(outside, root=tmp_path) is False
 
 
 def test_should_analyze_file_invalid_path_type_returns_false():
     """Verify should_analyze_file returns False for invalid path types."""
-    assert should_analyze_file("string_path", Path("/root")) is False
-    assert should_analyze_file(Path("/foo.py"), "string_root") is False
+    assert should_analyze_file("string_path", root=Path("/root")) is False
+    assert should_analyze_file(Path("/foo.py"), root="string_root") is False
 
 
 @pytest.mark.parametrize("excluded_dir", list(EXCLUDE_DIRS))
@@ -471,7 +471,7 @@ def test_should_analyze_file_excludes_all_exclude_dirs(tmp_path, excluded_dir):
     test_file.parent.mkdir(parents=True)
     test_file.write_text("# code")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 def test_should_analyze_file_with_deeply_nested_excluded_dir(tmp_path):
@@ -481,7 +481,7 @@ def test_should_analyze_file_with_deeply_nested_excluded_dir(tmp_path):
     test_file = nested_excluded / "hook.py"
     test_file.write_text("# hook")
 
-    assert should_analyze_file(test_file, tmp_path) is False
+    assert should_analyze_file(test_file, root=tmp_path) is False
 
 
 # ============================================================================

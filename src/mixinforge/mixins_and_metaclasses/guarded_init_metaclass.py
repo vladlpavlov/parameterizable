@@ -14,7 +14,7 @@ from typing import Any, Type, TypeVar
 T = TypeVar('T')
 
 
-def _validate_pickle_state_integrity(state: Any, cls_name: str) -> None:
+def _validate_pickle_state_integrity(state: Any, *, cls_name: str) -> None:
     """Ensure pickled state does not claim initialization is finished.
 
     Args:
@@ -24,14 +24,14 @@ def _validate_pickle_state_integrity(state: Any, cls_name: str) -> None:
     Raises:
         RuntimeError: If _init_finished is True in the pickled state.
     """
-    candidate_dict, _ = _parse_pickle_state(state, cls_name)
+    candidate_dict, _ = _parse_pickle_state(state, cls_name=cls_name)
 
     if candidate_dict is not None and candidate_dict.get("_init_finished") is True:
         raise RuntimeError(
             f"{cls_name} must not be pickled with _init_finished=True")
 
 
-def _parse_pickle_state(state: Any, cls_name: str) -> tuple[dict | None, dict | None]:
+def _parse_pickle_state(state: Any, *, cls_name: str) -> tuple[dict | None, dict | None]:
     """Extract __dict__ and __slots__ state from pickle data.
 
     Args:
@@ -57,7 +57,7 @@ def _parse_pickle_state(state: Any, cls_name: str) -> tuple[dict | None, dict | 
             f"Unsupported pickle state for {cls_name}: {state!r}")
 
 
-def _restore_dict_state(instance: Any, state_dict: dict, cls_name: str) -> None:
+def _restore_dict_state(instance: Any, *, state_dict: dict, cls_name: str) -> None:
     """Update instance __dict__ with restored state.
 
     Args:
@@ -76,7 +76,7 @@ def _restore_dict_state(instance: Any, state_dict: dict, cls_name: str) -> None:
             f"instance has no __dict__ but state contains a dictionary.")
 
 
-def _restore_slots_state(instance: Any, state_slots: dict[str,Any]) -> None:
+def _restore_slots_state(instance: Any, *, state_slots: dict[str,Any]) -> None:
     """Restore slot values using setattr.
 
     Args:
@@ -104,7 +104,7 @@ def _invoke_post_setstate_hook(instance: Any) -> None:
         try:
             post_setstate()
         except Exception as e:
-            _re_raise_with_context("__post_setstate__", e)
+            _re_raise_with_context("__post_setstate__", exc=e)
 
 
 def _has_slots_without_dict(cls: type) -> bool:
@@ -130,7 +130,7 @@ def _has_slots_without_dict(cls: type) -> bool:
     return False
 
 
-def _validate_init_finished_slot(cls: type, name: str) -> None:
+def _validate_init_finished_slot(cls: type, *, name: str) -> None:
     """Validate that _init_finished is declared in __slots__ if needed.
 
     Args:
@@ -203,7 +203,7 @@ class GuardedInitMeta(ABCMeta):
         """
         super().__init__(name, bases, dct)
         _raise_if_dataclass(cls)
-        _validate_init_finished_slot(cls, name)
+        _validate_init_finished_slot(cls, name=name)
 
         n_guarded_bases = sum(1 for base in bases if isinstance(base, GuardedInitMeta))
         if n_guarded_bases > 1:
@@ -222,18 +222,18 @@ class GuardedInitMeta(ABCMeta):
 
         def setstate_wrapper(self, state):
             """Restore state, finalize initialization, and invoke hook."""
-            _validate_pickle_state_integrity(state, type(self).__name__)
+            _validate_pickle_state_integrity(state, cls_name=type(self).__name__)
 
             if original_setstate is not None:
                 original_setstate(self, state)
             else:
-                state_dict, state_slots = _parse_pickle_state(state, type(self).__name__)
+                state_dict, state_slots = _parse_pickle_state(state, cls_name=type(self).__name__)
 
                 if state_dict is not None:
-                    _restore_dict_state(self, state_dict, type(self).__name__)
+                    _restore_dict_state(self, state_dict=state_dict, cls_name=type(self).__name__)
 
                 if state_slots is not None:
-                    _restore_slots_state(self, state_slots)
+                    _restore_slots_state(self, state_slots=state_slots)
 
             if isinstance(self, cls):
                 self._init_finished = True
@@ -290,12 +290,12 @@ class GuardedInitMeta(ABCMeta):
             try:
                 post_init()
             except Exception as e:
-                _re_raise_with_context("__post_init__", e)
+                _re_raise_with_context("__post_init__", exc=e)
 
         return instance
 
 
-def _re_raise_with_context(hook_name: str, exc: Exception) -> None:
+def _re_raise_with_context(hook_name: str, *, exc: Exception) -> None:
     """Re-raise an exception with added context about the hook.
 
     Args:

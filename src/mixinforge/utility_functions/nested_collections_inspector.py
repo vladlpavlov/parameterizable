@@ -275,7 +275,8 @@ def flatten_nested_collection(obj: Iterable[Any]) -> Iterator[Any]:
 def find_instances_inside_composite_object(
     obj: Any,
     classinfo: ClassInfo,
-    deep_search: bool = True
+    *,
+    deep_search: bool = True,
 ) -> Iterator[Any]:
     """Find all instances of a target type within any object.
 

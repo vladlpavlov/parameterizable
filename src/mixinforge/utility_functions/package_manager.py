@@ -29,7 +29,7 @@ _REQUIREMENT_MARKER_PATTERN: Final[re.Pattern[str]] = re.compile(r"[<>=!~@;]")
 _REQUIREMENT_AT_PATTERN: Final[re.Pattern[str]] = re.compile(r"\s+@\s+\S+")
 
 
-def _run(command: list[str], timeout: int = 300) -> None:
+def _run(command: list[str], *, timeout: int = 300) -> None:
     """Execute a package management command with timeout protection.
 
     Automatically invalidates import caches after execution.
@@ -63,6 +63,7 @@ def _is_module_available(module_name: str) -> bool:
 
 def _validate_package_args(
         package_name: str,
+        *,
         import_name: str | None = None,
         version: str | None = None,
         allow_requirement: bool = False,
@@ -78,13 +79,14 @@ def _validate_package_args(
     Raises:
         ValueError: If arguments are invalid.
     """
-    _validate_package_name(package_name, allow_requirement, version)
+    _validate_package_name(package_name, allow_requirement=allow_requirement, version=version)
     _validate_version(version)
     _validate_import_name(import_name)
 
 
 def _validate_package_name(
         package_name: str,
+        *,
         allow_requirement: bool,
         version: str | None,
 ) -> None:
@@ -102,13 +104,14 @@ def _validate_package_name(
         raise ValueError("package_name must be a non-empty string")
 
     if allow_requirement:
-        _validate_requirement_spec(package_name, version)
+        _validate_requirement_spec(package_name, version=version)
     elif not _PACKAGE_NAME_PATTERN.match(package_name):
         raise ValueError(f"Invalid package name format: {package_name}")
 
 
 def _validate_requirement_spec(
         package_name: str,
+        *,
         version: str | None,
 ) -> None:
     """Validate PEP 508 requirement strings.
@@ -335,11 +338,12 @@ def is_package_installed(package_name: str) -> bool:
 
 
 def install_package(package_name: str,
+        *,
         upgrade: bool = False,
         version: str | None = None,
         use_uv: bool = True,
         import_name: str | None = None,
-        verify_import: bool = True
+        verify_import: bool = True,
         ) -> None:
     """Install a Python package from PyPI into the current environment.
 
@@ -405,6 +409,7 @@ def install_package(package_name: str,
 
 
 def uninstall_package(package_name: str,
+            *,
             use_uv: bool = True,
             import_name: str | None = None,
             verify_uninstall: bool = True,

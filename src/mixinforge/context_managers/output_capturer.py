@@ -50,7 +50,7 @@ class OutputCapturer:
             original: The original stream (stdout or stderr) to preserve.
             buffer: The StringIO buffer to capture output.
         """
-        def __init__(self, original, buffer):
+        def __init__(self, *, original, buffer):
             self.original = original
             self.buffer = buffer
 
@@ -78,7 +78,7 @@ class OutputCapturer:
             buffer: The StringIO buffer to capture logging output.
             original_handlers: The original logging handlers to forward records to.
         """
-        def __init__(self, buffer, original_handlers):
+        def __init__(self, *, buffer, original_handlers):
             super().__init__()
             self.buffer = buffer
             self.original_handlers = original_handlers
@@ -131,10 +131,10 @@ class OutputCapturer:
         original_handlers = logging.root.handlers[:]
 
         # Create tees pointing to current streams
-        tee_stdout = self._TeeStream(original_stdout, self.captured_buffer)
-        tee_stderr = self._TeeStream(original_stderr, self.captured_buffer)
+        tee_stdout = self._TeeStream(original=original_stdout, buffer=self.captured_buffer)
+        tee_stderr = self._TeeStream(original=original_stderr, buffer=self.captured_buffer)
         capture_handler = self._CaptureHandler(
-            self.captured_buffer, original_handlers)
+            buffer=self.captured_buffer, original_handlers=original_handlers)
 
         # Register cleanup callbacks (LIFO order - restored in reverse)
         self._stack.callback(setattr, sys, 'stdout', original_stdout)
