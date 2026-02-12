@@ -52,7 +52,8 @@ class ParameterizableMixin:
 
     def _extend_parent_params(self, **new_params: Any) -> dict[str, Any]:
         """Extend parent parameters with keyword overrides."""
-        params = super().get_params()
+        parent = super(type(self), self)
+        params = parent.get_params() if hasattr(parent, "get_params") else {}
         params = {**params, **new_params}
         params = sort_dict_by_keys(params)
         return params
