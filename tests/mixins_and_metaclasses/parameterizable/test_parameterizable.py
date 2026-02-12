@@ -135,3 +135,39 @@ def test_extend_parent_params_accepts_kwargs_and_overrides():
     assert params["y"] == 99
     assert params["z"] == 30
     assert set(params.keys()) == {"x", "y", "z"}
+
+
+def test_extend_parent_params_base_class_falls_back_to_new_params():
+    base = ParameterizableMixin()
+    params = base._extend_parent_params(b=2, a=1)
+    assert params == {"a": 1, "b": 2}
+
+
+def test_extend_parent_params_child_without_get_params():
+    class NoParamsChild(ParameterizableMixin):
+        pass
+
+    child = NoParamsChild()
+    params = child._extend_parent_params(c=3, a=1, b=2)
+    assert params == {"a": 1, "b": 2, "c": 3}
+
+
+def test_extend_parent_params_grandchild_get_params_use_case():
+    class ClassA(ParameterizableMixin):
+        def __init__(self, a: int = 1) -> None:
+            self.a = a
+
+        def get_params(self) -> dict[str, Any]:
+            return {"a": self.a}
+
+    class ClassB(ClassA):
+        def __init__(self, a: int = 1, b: int = 2) -> None:
+            super().__init__(a=a)
+            self.b = b
+
+        def get_params(self) -> dict[str, Any]:
+            return self._extend_parent_params(b=self.b)
+
+    obj = ClassB(a=10, b=20)
+    params = obj.get_params()
+    assert params == {"a": 10, "b": 20}
