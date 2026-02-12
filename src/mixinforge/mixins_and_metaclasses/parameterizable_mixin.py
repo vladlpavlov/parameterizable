@@ -50,6 +50,14 @@ class ParameterizableMixin:
         return params
 
 
+    def _extend_parent_params(self, **new_params: Any) -> dict[str, Any]:
+        """Extend parent parameters with keyword overrides."""
+        params = super().get_params()
+        params = {**params, **new_params}
+        params = sort_dict_by_keys(params)
+        return params
+
+
     def get_jsparams(self) -> JsonSerializedObject:
         """Return this instance's parameters encoded as JSON.
 

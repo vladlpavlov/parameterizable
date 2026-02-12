@@ -40,6 +40,26 @@ class MyParam(ParameterizableMixin):
         }
 
 
+class ParentParam(ParameterizableMixin):
+    def __init__(self, x: int = 1, y: int = 2) -> None:
+        self.x = x
+        self.y = y
+
+    def get_params(self) -> dict[str, Any]:
+        return {"x": self.x, "y": self.y}
+
+
+class ChildParam(ParentParam):
+    def __init__(self, x: int = 1, y: int = 2, z: int = 3) -> None:
+        super().__init__(x=x, y=y)
+        self.z = z
+
+    def get_params(self) -> dict[str, Any]:
+        params = super().get_params()
+        params["z"] = self.z
+        return params
+
+
 def test_base_class_defaults_and_jsparams_are_empty():
     # Base class returns empty params dict
     base = ParameterizableMixin()
@@ -91,3 +111,27 @@ def test_repr_includes_class_name_and_params():
     assert "'a': 1" in r
     assert "'b': 2" in r
     assert "'verbose': False" in r
+
+
+def test_get_params_can_extend_parent_params_with_super():
+    """Child get_params can reuse parent params and extend them."""
+    child = ChildParam(x=10, y=20, z=30)
+    base = ParentParam(x=1, y=2)
+
+    params = child.get_params()
+
+    assert params == {"x": 10, "y": 20, "z": 30}
+    assert set(params.keys()) == {"x", "y", "z"}
+    assert base.get_params() == {"x": 1, "y": 2}
+
+
+def test_extend_parent_params_accepts_kwargs_and_overrides():
+    """Helper merges parent params with provided keyword overrides."""
+    child = ChildParam(x=10, y=20, z=30)
+
+    params = child._extend_parent_params(z=child.z, y=99)
+
+    assert params["x"] == 10
+    assert params["y"] == 99
+    assert params["z"] == 30
+    assert set(params.keys()) == {"x", "y", "z"}
